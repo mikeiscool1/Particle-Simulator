@@ -37,9 +37,14 @@ do not have enough velocity to escape.
 
 To edit how much bounce particles have, change `restitution` from 0 to 1. 
 
+The gravitational constant can also be changed. A greater `g` allows for small masses to have meaningful gravity, while a smaller `g` may be more accurate for realistic simulations.
+
 Finally, to make your particles follow a strict function with respect to time (ignoring velocity, acceleration, gravity, etc., useful for 3d shapes like the lissajous curve,
 as included in the code as an example), set `use_time_function` to true.
 
 If you're using the time function, edit the `time_function` function to create your function. Otherwise, to set up particles, use the `set_particles` function.
 
 The example code included is a cube of particles with random starting velocities that, on play, will go in all different directions.
+
+## Warning
+Making extremely dense particles by giving small particles a lot of mass (for example, 0.1 radius and 10 billion kg) can lead to instability, such as explosive energy.

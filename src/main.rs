@@ -11,6 +11,7 @@ struct State {
     use_time_function: bool,
     min_merge_mass: f32,
     restitution: f32,
+    g: f32,
     yaw: f32,
     pitch: f32,
     pos: Vec3,
@@ -42,6 +43,7 @@ async fn main() {
         use_time_function: false,
         min_merge_mass: f32::INFINITY,
         restitution: 0.5,
+        g: 6.67430e-11,
         yaw: -135.0f32.to_radians(),
         pitch: -45.0f32.to_radians(),
         pos: vec3(15.0, 15.0, 15.0),
@@ -68,21 +70,6 @@ async fn main() {
             state.alert_flash = (state.alert_flash - dt).max(0.0);
         }
 
-        // Compute forward and right from yaw and pitch
-        let forward = vec3(
-            state.pitch.cos() * state.yaw.cos(),
-            state.pitch.sin(),
-            state.pitch.cos() * state.yaw.sin(),
-        )
-        .normalize();
-
-        state.camera = Camera3D {
-            position: state.pos,
-            target: state.pos + forward,
-            up: vec3(0.0, 1.0, 0.0),
-            ..Default::default()
-        };
-
         clear_background(Color::new(0.1, 0.1, 0.15, 1.0));
         set_camera(&state.camera);
 
@@ -103,6 +90,7 @@ async fn main() {
                     sim_dt,
                     state.restitution,
                     state.min_merge_mass,
+                    state.g,
                 );
             }
         }
@@ -213,7 +201,7 @@ fn handle_input(state: &mut State, particles: &mut Vec<Particle>, dt: f32) {
         state.clock_running = false;
         state.time = 0.0;
         set_particles(particles);
-        n_body_update(particles);
+        n_body_update(particles, state.g);
 
         state.alert_flash = state.alert_flash_duration;
         state.alert_text = "Simulation Reset".to_string();
@@ -293,6 +281,7 @@ fn set_particles(particles: &mut Vec<Particle>) {
                         rand::gen_range(-25.0, 25.0),
                         rand::gen_range(-25.0, 25.0),
                     ),
+                    mass: 0.0,
                     color,
                     ..Default::default()
                 });
@@ -385,6 +374,7 @@ fn update_particles_verlet(
     dt: f32,
     restitution: f32,
     min_merge_mass: f32,
+    g: f32,
 ) {
     let old_acc: Vec<Vec3> = particles.iter().map(|p| p.acc).collect();
 
@@ -392,8 +382,8 @@ fn update_particles_verlet(
         p.verlet_drift(dt);
     }
 
-    resolve_collisions(particles, restitution, min_merge_mass);
-    n_body_update(particles);
+    resolve_collisions(particles, restitution, min_merge_mass, g);
+    n_body_update(particles, g);
 
     for (p, &prev_acc) in particles.iter_mut().zip(old_acc.iter()) {
         p.verlet_kick(prev_acc, dt);
@@ -402,7 +392,7 @@ fn update_particles_verlet(
     for p in particles.iter_mut() { p.update_trail(); }
 }
 
-fn resolve_collisions(particles: &mut Vec<Particle>, restitution: f32, min_merge_mass: f32) {
+fn resolve_collisions(particles: &mut Vec<Particle>, restitution: f32, min_merge_mass: f32, g: f32) {
     let mut i = 0;
     while i < particles.len() {
         if particles[i].mass <= 0.0 {
@@ -444,10 +434,8 @@ fn resolve_collisions(particles: &mut Vec<Particle>, restitution: f32, min_merge
                 let relative_velocity = particles[j].vel - particles[i].vel;
                 let relative_speed_normal = relative_velocity.dot(normal);
 
-                let g: f32 = 6.67430e-11;
                 let total_mass = particles[i].mass + particles[j].mass;
-                let escape_factor = 0.1;
-                let escape_velocity = (escape_factor * g * total_mass / distance.max(1e-6)).sqrt();
+                let escape_velocity = (2.0 * g * total_mass / distance.max(1e-6)).sqrt();
                 let approach_speed = (-relative_speed_normal).max(0.0);
 
                 let should_merge = particles[i].mass >= min_merge_mass && particles[j].mass >= min_merge_mass && approach_speed < escape_velocity;
@@ -526,8 +514,7 @@ fn merge_particles(particles: &mut Vec<Particle>, i: usize, j: usize) {
     particles.swap_remove(j);
 }
 
-fn n_body_update(particles: &mut [Particle]) {
-    let g = 6.67430e-11; // gravitational constant
+fn n_body_update(particles: &mut [Particle], g: f32) {
     let n = particles.len();
 
     for i in 0..n {
