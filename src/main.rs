@@ -14,26 +14,26 @@ use draw::draw_particles;
 use setup::{set_particles, time_function};
 
 struct State {
-    show_grid: bool,
-    use_cubes: bool,
-    show_trail: bool,
-    use_time_function: bool,
-    min_merge_mass: f32,
-    restitution: f32,
-    g: f32,
-    yaw: f32,
-    pitch: f32,
-    pos: Vec3,
+    show_grid: bool, // Display the 3D grids
+    use_cubes: bool, // Display particles as cubes instead of spheres
+    show_trail: bool, // Show trails behind particles
+    use_time_function: bool, // Have particles follow a function with respect to time instead of physics
+    min_merge_mass: f32, // The minimum mass both particles must have to merge; set to infinity to disable merging
+    restitution: f32, // Coefficient of restitution for collisions
+    g: f32, // Gravitational constant
+    yaw: f32, // Start camera yaw (rotation around the Y axis)
+    pitch: f32, // Start camera pitch (rotation around the X axis)
+    pos: Vec3, // Start camera position
     camera: Camera3D,
     last_mouse: Option<(f32, f32)>,
-    is_fullscreen: bool,
-    time: f32,
-    time_warp: f32,
-    speed: f32,
+    is_fullscreen: bool, // Whether the window is currently in fullscreen mode
+    time: f32, // Elapsed simulation time
+    time_warp: f32, // Factor to speed up or slow down time; 1.0 is normal speed
+    speed: f32, // Camera speed
     alert_flash: f32,
     alert_flash_duration: f32,
     alert_text: String,
-    clock_running: bool,
+    clock_running: bool, // Whether the simulation clock is running; if false, time will not advance and particles will not move
 }
 
 fn window_conf() -> Conf {
