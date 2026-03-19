@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use macroquad::prelude::*;
+use crate::force::{resolve_collisions, n_body_update};
 
 #[derive(Debug, Clone)]
 pub struct Particle {
@@ -45,4 +46,27 @@ impl Default for Particle {
             trail: VecDeque::new(),
         }
     }
+}
+
+pub fn update_particles_verlet(
+    particles: &mut Vec<Particle>,
+    dt: f32,
+    restitution: f32,
+    min_merge_mass: f32,
+    g: f32,
+) {
+    let old_acc: Vec<Vec3> = particles.iter().map(|p| p.acc).collect();
+
+    for p in particles.iter_mut() {
+        p.verlet_drift(dt);
+    }
+
+    resolve_collisions(particles, restitution, min_merge_mass, g);
+    n_body_update(particles, g);
+
+    for (p, &prev_acc) in particles.iter_mut().zip(old_acc.iter()) {
+        p.verlet_kick(prev_acc, dt);
+    }
+
+    for p in particles.iter_mut() { p.update_trail(); }
 }

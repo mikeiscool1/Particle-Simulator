@@ -42,7 +42,7 @@ The gravitational constant can also be changed. A greater `g` allows for small m
 Finally, to make your particles follow a strict function with respect to time (ignoring velocity, acceleration, gravity, etc., useful for 3d shapes like the lissajous curve,
 as included in the code as an example), set `use_time_function` to true.
 
-If you're using the time function, edit the `time_function` function to create your function. Otherwise, to set up particles, use the `set_particles` function.
+If you're using the time function, edit the `time_function` function in `setup.rs` to create your function. Otherwise, to set up particles, use the `set_particles` function.
 
 The example code included is a cube of particles with random starting velocities that, on play, will go in all different directions.
 
