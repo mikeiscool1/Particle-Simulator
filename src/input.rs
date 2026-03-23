@@ -22,12 +22,10 @@ pub fn handle_input(state: &mut State, particles: &mut Vec<Particle>, dt: f32) {
         state.clock_running = !state.clock_running;
 
         if state.clock_running {
-            state.alert_text = "Simulation Started".to_string();
+            state.alert("Simulation Started");
         } else {
-            state.alert_text = "Simulation Paused".to_string();
+            state.alert("Simulation Paused");
         }
-
-        state.alert_flash = state.alert_flash_duration;
     }
 
     let sensitivity = 0.003;
@@ -78,53 +76,44 @@ pub fn handle_input(state: &mut State, particles: &mut Vec<Particle>, dt: f32) {
         set_particles(particles);
         n_body_update(particles, state.g);
 
-        state.alert_flash = state.alert_flash_duration;
-        state.alert_text = "Simulation Reset".to_string();
+        state.alert("Simulation Reset");
     }
 
     // Setting toggles
     if is_key_pressed(KeyCode::F1) {
         state.time_warp *= 0.5;
-        state.alert_flash = state.alert_flash_duration;
-        state.alert_text = format!("Time Warp: {}x", format_dec(state.time_warp));
+        state.alert(&format!("Time Warp: {}x", format_dec(state.time_warp)));
     }
     if is_key_pressed(KeyCode::F2) {
         state.time_warp *= 2.0;
-        state.alert_flash = state.alert_flash_duration;
-        state.alert_text = format!("Time Warp: {}x", format_dec(state.time_warp));
+        state.alert(&format!("Time Warp: {}x", format_dec(state.time_warp)));
     }
     if is_key_pressed(KeyCode::G) {
         state.show_grid = !state.show_grid;
-        state.alert_flash = state.alert_flash_duration;
-        state.alert_text = format!("Grid: {}", if state.show_grid { "On" } else { "Off" });
+        state.alert(&format!("Grid: {}", if state.show_grid { "On" } else { "Off" }));
     }
     if is_key_pressed(KeyCode::T) {
         state.show_trail = !state.show_trail;
-        state.alert_flash = state.alert_flash_duration;
-        state.alert_text = format!("Trails: {}", if state.show_trail { "On" } else { "Off" });
+        state.alert(&format!("Trails: {}", if state.show_trail { "On" } else { "Off" }));
     }
     if is_key_pressed(KeyCode::C) {
         state.use_cubes = !state.use_cubes;
-        state.alert_flash = state.alert_flash_duration;
-        state.alert_text = format!("Render Mode: {}", if state.use_cubes { "Cubes" } else { "Spheres" });
+        state.alert(&format!("Render Mode: {}", if state.use_cubes { "Cubes" } else { "Spheres" }));
     }
 
     if is_key_pressed(KeyCode::F3) {
         state.speed *= 0.5;
-        state.alert_flash = state.alert_flash_duration;
-        state.alert_text = format!("Speed: {}x", format_dec(state.speed));
+        state.alert(&format!("Speed: {}x", format_dec(state.speed)));
     }
     if is_key_pressed(KeyCode::F4) {
         state.speed *= 2.0;
-        state.alert_flash = state.alert_flash_duration;
-        state.alert_text = format!("Speed: {}x", format_dec(state.speed));
+        state.alert(&format!("Speed: {}x", format_dec(state.speed)));
     }
     if is_key_pressed(KeyCode::O) {
         state.yaw = -135.0f32.to_radians();
         state.pitch = -45.0f32.to_radians();
         state.pos = vec3(15.0, 15.0, 15.0);
-        state.alert_flash = state.alert_flash_duration;
-        state.alert_text = "Camera Reset".to_string();
+        state.alert("Camera Reset");
     }
 }
 

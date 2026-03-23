@@ -36,6 +36,13 @@ struct State {
     clock_running: bool, // Whether the simulation clock is running; if false, time will not advance and particles will not move
 }
 
+impl State {
+    fn alert(&mut self, text: &str) {
+        self.alert_text = text.to_string();
+        self.alert_flash = self.alert_flash_duration;
+    }
+}
+
 fn window_conf() -> Conf {
     Conf {
         window_title: "MyGame".to_owned(),
