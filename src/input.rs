@@ -1,9 +1,8 @@
 use macroquad::prelude::*;
 use crate::State;
-use crate::component::{Particle, Event};
-use crate::setup::set_particles;
+use crate::component::Event;
 
-pub fn handle_input(state: &mut State, particles: &mut Vec<Particle>, dt: f32) {
+pub fn handle_input(state: &mut State, dt: f32) {
 // Full screen check
     if is_key_pressed(KeyCode::F11) {
         if !state.is_fullscreen {
@@ -90,11 +89,7 @@ pub fn handle_input(state: &mut State, particles: &mut Vec<Particle>, dt: f32) {
     if is_key_down(KeyCode::Q) { state.pos.y -= state.speed * 10.0 * dt; }
     // Reset
     if is_key_pressed(KeyCode::R) {
-        state.clock_running = false;
         state.events.push(Event::ResetSimulation);
-        set_particles(particles);
-
-        state.events.push(Event::Alert("Simulation Reset".to_string()));
     }
 
     // Setting toggles

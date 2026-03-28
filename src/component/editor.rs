@@ -71,6 +71,7 @@ pub struct Editor {
     parametric_error: Option<String>,
     merge_enabled: bool,
     merge_mass_threshold: f32,
+    show_grid: bool,
 }
 
 impl Editor {
@@ -83,6 +84,7 @@ impl Editor {
             parametric_error: None,
             merge_enabled: false,
             merge_mass_threshold: 1e10,
+            show_grid: false,
         }
     }
 
@@ -163,6 +165,46 @@ impl Editor {
                     state.bg_color = Color::new(rgba[0], rgba[1], rgba[2], rgba[3]);
                 }
                 ui.end_row();
+
+                ui.label("Show Grid");
+                ui.checkbox(&mut self.show_grid, "");
+                if self.show_grid {
+                    state.events.push(Event::ShowGrid(true));
+                } else {
+                    state.events.push(Event::ShowGrid(false));
+                }
+
+                ui.end_row();
+            });
+
+        ui.separator();
+
+        ui.label("Camera");
+        egui::Grid::new("options_camera")
+            .num_columns(2)
+            .spacing([8.0, 4.0])
+            .show(ui, |ui| {
+                ui.label("Position");
+                ui.add(egui::DragValue::new(&mut state.pos.x).speed(0.1));
+                ui.add(egui::DragValue::new(&mut state.pos.y).speed(0.1));
+                ui.add(egui::DragValue::new(&mut state.pos.z).speed(0.1));
+                ui.end_row();
+
+                ui.label("Yaw");
+                ui.add(egui::DragValue::new(&mut state.yaw).speed(0.1));
+                ui.end_row();
+
+                ui.label("Pitch");
+                ui.add(egui::DragValue::new(&mut state.pitch).speed(0.1));
+                ui.end_row();
+
+                ui.label("Speed");
+                ui.add(
+                    egui::DragValue::new(&mut state.speed)
+                        .speed(0.01)
+                        .range(0.001..=1000.0_f32),
+                );
+                ui.end_row();
             });
 
         ui.separator();
@@ -172,11 +214,15 @@ impl Editor {
             .num_columns(2)
             .spacing([8.0, 4.0])
             .show(ui, |ui| {
-                ui.label("Clock running");
+                ui.label("Clock Running");
                 ui.checkbox(&mut state.clock_running, "");
                 ui.end_row();
+                
+                ui.label("Elapsed Time");
+                ui.add(egui::DragValue::new(&mut particles.time).speed(0.1));
+                ui.end_row();
 
-                ui.label("Time warp");
+                ui.label("Time Warp");
                 ui.add(
                     egui::DragValue::new(&mut state.time_warp)
                         .speed(0.01)
@@ -184,19 +230,7 @@ impl Editor {
                 );
                 ui.end_row();
 
-                ui.label("Camera speed");
-                ui.add(
-                    egui::DragValue::new(&mut state.speed)
-                        .speed(0.01)
-                        .range(0.001..=1000.0_f32),
-                );
-                ui.end_row();
-
-                ui.label("Elapsed time");
-                ui.add(egui::DragValue::new(&mut particles.time).speed(0.1));
-                ui.end_row();
-
-                ui.label("Use parametric");
+                ui.label("Use Parametric");
                 let was_parametric = particles.use_parametric;
                 if ui.checkbox(&mut particles.use_parametric, "").changed() {
                     // Unhide everything on mode switch; re-hide unused if entering parametric
@@ -212,6 +246,10 @@ impl Editor {
                 }
                 let _ = was_parametric;
                 ui.end_row();
+
+                if ui.button("Reset").clicked() {
+                    state.events.push(Event::ResetSimulation);
+                }
             });
 
         ui.separator();
@@ -250,7 +288,7 @@ impl Editor {
                 ui.end_row();
 
                 if self.merge_enabled {
-                    ui.label("Min merge mass");
+                    ui.label("Min Merge Mass");
                     if ui
                         .add(
                             egui::DragValue::new(&mut self.merge_mass_threshold)
@@ -272,11 +310,11 @@ impl Editor {
             .num_columns(2)
             .spacing([8.0, 4.0])
             .show(ui, |ui| {
-                ui.label("Show trails");
+                ui.label("Show Trails");
                 ui.checkbox(&mut particles.show_trail, "");
                 ui.end_row();
 
-                ui.label("Use cubes");
+                ui.label("Use Cubes");
                 ui.checkbox(&mut particles.use_cubes, "");
                 ui.end_row();
             });

@@ -88,7 +88,7 @@ async fn main() {
         });
 
         // Inputs
-        handle_input(&mut state, &mut particles.particles, dt);
+        handle_input(&mut state, dt);
 
         particles.handle_input(&mut state);
         grid.handle_input(&mut state);
@@ -99,7 +99,13 @@ async fn main() {
         for event in state.events.drain(..) {
             match event {
                 component::Event::Alert(message) => alert.alert(&message),
-                component::Event::ResetSimulation => particles.time = 0.0
+                component::Event::ResetSimulation => {
+                    state.clock_running = false;
+                    particles.time = 0.0;
+                    set_particles(&mut particles.particles);
+                    alert.alert("Simulation Reset");
+                }
+                component::Event::ShowGrid(visible) => grid.visible = visible,
             }
         }
 
