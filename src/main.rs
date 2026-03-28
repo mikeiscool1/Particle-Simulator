@@ -71,7 +71,7 @@ async fn main() {
     let mut grid = Grid { visible: false };
     let mut alert = Alert::new();
     let mut fps = component::FPS { visible: false, last_update_time: 0.0, fps: get_fps() };
-    let mut editor = Editor::new(true, component::editor::EditorMode::Particles);
+    let mut editor = Editor::new(true);
 
     editor.try_compile_parametric(&mut particles, &mut state);
 
