@@ -1,5 +1,5 @@
 use macroquad::prelude::*;
-use crate::particle::Particle;
+use crate::component::Particle;
 use std::collections::VecDeque;
 
 pub fn resolve_collisions(particles: &mut Vec<Particle>, restitution: f32, min_merge_mass: f32, g: f32) {

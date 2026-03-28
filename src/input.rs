@@ -1,7 +1,6 @@
 use macroquad::prelude::*;
 use crate::State;
-use crate::Particle;
-use crate::force::n_body_update;
+use crate::component::{Particle, Event};
 use crate::setup::set_particles;
 
 pub fn handle_input(state: &mut State, particles: &mut Vec<Particle>, dt: f32) {
@@ -18,29 +17,57 @@ pub fn handle_input(state: &mut State, particles: &mut Vec<Particle>, dt: f32) {
         }
     }
 
-    if is_key_pressed(KeyCode::Space) {
-        state.clock_running = !state.clock_running;
-
-        if state.clock_running {
-            state.alert("Simulation Started");
-        } else {
-            state.alert("Simulation Paused");
-        }
-    }
-
-    let sensitivity = 0.003;
-
-    // Compute forward and right from yaw and pitch
     let forward = vec3(
         state.pitch.cos() * state.yaw.cos(),
         state.pitch.sin(),
         state.pitch.cos() * state.yaw.sin(),
     )
     .normalize();
+
+    state.camera = Camera3D {
+        position: state.pos,
+        target: state.pos + forward,
+        up: vec3(0.0, 1.0, 0.0),
+        ..Default::default()
+    };
+
+    if state.ui_captures_keyboard {
+        return;
+    }
+
+    if is_key_pressed(KeyCode::Space) {
+        state.clock_running = !state.clock_running;
+
+        if state.clock_running {
+            state.events.push(Event::Alert("Simulation Running".to_string()));
+        } else {
+            state.events.push(Event::Alert("Simulation Paused".to_string()));
+        }
+    }
+
+    if state.ui_captures_keyboard {
+        state.camera = Camera3D {
+            position: state.pos,
+            target: state.pos
+                + vec3(
+                    state.pitch.cos() * state.yaw.cos(),
+                    state.pitch.sin(),
+                    state.pitch.cos() * state.yaw.sin(),
+                )
+                .normalize(),
+            up: vec3(0.0, 1.0, 0.0),
+            ..Default::default()
+        };
+        return;
+    }
+
+    let sensitivity = 0.003;
+
+    // Compute forward and right from yaw and pitch
     let right = forward.cross(vec3(0.0, 1.0, 0.0)).normalize();
 
     // Right click mouse look
-    if is_mouse_button_down(MouseButton::Right) {
+    if !state.ui_captures_pointer && is_mouse_button_down(MouseButton::Right) {
         let mouse = mouse_position();
         if let Some((lx, ly)) = state.last_mouse {
             let dx = mouse.0 - lx;
@@ -61,59 +88,37 @@ pub fn handle_input(state: &mut State, particles: &mut Vec<Particle>, dt: f32) {
     if is_key_down(KeyCode::D) { state.pos += right * state.speed * 10.0 * dt; }
     if is_key_down(KeyCode::E) { state.pos.y += state.speed * 10.0 * dt; }
     if is_key_down(KeyCode::Q) { state.pos.y -= state.speed * 10.0 * dt; }
-
-    state.camera = Camera3D {
-        position: state.pos,
-        target: state.pos + forward,
-        up: vec3(0.0, 1.0, 0.0),
-        ..Default::default()
-    };
-
     // Reset
     if is_key_pressed(KeyCode::R) {
         state.clock_running = false;
-        state.time = 0.0;
+        state.events.push(Event::ResetSimulation);
         set_particles(particles);
-        n_body_update(particles, state.g);
 
-        state.alert("Simulation Reset");
+        state.events.push(Event::Alert("Simulation Reset".to_string()));
     }
 
     // Setting toggles
     if is_key_pressed(KeyCode::F1) {
         state.time_warp *= 0.5;
-        state.alert(&format!("Time Warp: {}x", format_dec(state.time_warp)));
+        state.events.push(Event::Alert(format!("Time Warp: {}x", format_dec(state.time_warp))));
     }
     if is_key_pressed(KeyCode::F2) {
         state.time_warp *= 2.0;
-        state.alert(&format!("Time Warp: {}x", format_dec(state.time_warp)));
+        state.events.push(Event::Alert(format!("Time Warp: {}x", format_dec(state.time_warp))));
     }
-    if is_key_pressed(KeyCode::G) {
-        state.show_grid = !state.show_grid;
-        state.alert(&format!("Grid: {}", if state.show_grid { "On" } else { "Off" }));
-    }
-    if is_key_pressed(KeyCode::T) {
-        state.show_trail = !state.show_trail;
-        state.alert(&format!("Trails: {}", if state.show_trail { "On" } else { "Off" }));
-    }
-    if is_key_pressed(KeyCode::C) {
-        state.use_cubes = !state.use_cubes;
-        state.alert(&format!("Render Mode: {}", if state.use_cubes { "Cubes" } else { "Spheres" }));
-    }
-
     if is_key_pressed(KeyCode::F3) {
         state.speed *= 0.5;
-        state.alert(&format!("Speed: {}x", format_dec(state.speed)));
+        state.events.push(Event::Alert(format!("Speed: {}x", format_dec(state.speed))));
     }
     if is_key_pressed(KeyCode::F4) {
         state.speed *= 2.0;
-        state.alert(&format!("Speed: {}x", format_dec(state.speed)));
+        state.events.push(Event::Alert(format!("Speed: {}x", format_dec(state.speed))));
     }
     if is_key_pressed(KeyCode::O) {
         state.yaw = -135.0f32.to_radians();
         state.pitch = -45.0f32.to_radians();
         state.pos = vec3(15.0, 15.0, 15.0);
-        state.alert("Camera Reset");
+        state.events.push(Event::Alert("Camera Reset".to_string()));
     }
 }
 
