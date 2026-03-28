@@ -4,17 +4,70 @@ use macroquad::prelude::*;
 use crate::component::{Component, Event, particles::{ParametricEquations, Particle, Particles, compile_parametric_fn}};
 use crate::State;
 
-pub struct Editor {
-    pub visible: bool,
-    expanded_particles: Vec<bool>,
-    pub x_expr: String,
-    pub y_expr: String,
-    pub z_expr: String,
-    pub spread_expr: String,
+struct ParametricEquationEditor {
+    x_expr: String,
+    y_expr: String,
+    z_expr: String,
+    spread_expr: String,
     x_expr_error: bool,
     y_expr_error: bool,
     z_expr_error: bool,
     spread_expr_error: bool,
+    period_expr: String,
+    period_expr_error: bool,
+    error: Option<String>,
+    num_particles: usize,
+    running: bool,
+    hidden: bool,
+}
+
+impl Default for ParametricEquationEditor {
+    fn default() -> Self {
+        Self {
+            x_expr: "0".to_string(),
+            y_expr: "0".to_string(),
+            z_expr: "0".to_string(),
+            spread_expr: "0.01".to_string(),
+            x_expr_error: false,
+            y_expr_error: false,
+            z_expr_error: false,
+            spread_expr_error: false,
+            error: None,
+            period_expr: "10.0".to_string(),
+            period_expr_error: false,
+            num_particles: 10,
+            running: true,
+            hidden: false,
+        }
+    }
+}
+
+impl ParametricEquationEditor {
+    fn example() -> Self {
+        Self {
+            x_expr: "3 * sin(t)".to_string(),
+            y_expr: "2 * sin(2 * t)".to_string(),
+            z_expr: "sin(3 * t)".to_string(),
+            spread_expr: "0.01".to_string(),
+            x_expr_error: false,
+            y_expr_error: false,
+            z_expr_error: false,
+            spread_expr_error: false,
+            error: None,
+            period_expr: "0".to_string(),
+            period_expr_error: false,
+            num_particles: 1000,
+            running: true,
+            hidden: false,
+        }
+    }
+}
+
+pub struct Editor {
+    pub visible: bool,
+    expanded_particles: Vec<bool>,
+    expanded_parametric: Vec<bool>,
+    parametric_equations: Vec<ParametricEquationEditor>,
     parametric_error: Option<String>,
     merge_enabled: bool,
     merge_mass_threshold: f32,
@@ -25,14 +78,8 @@ impl Editor {
         Self {
             visible,
             expanded_particles: Vec::new(),
-            x_expr: "3 * sin(t)".to_string(),
-            y_expr: "2 * sin(2 * t)".to_string(),
-            z_expr: "sin(3 * t)".to_string(),
-            spread_expr: "0.01".to_string(),
-            x_expr_error: false,
-            y_expr_error: false,
-            z_expr_error: false,
-            spread_expr_error: false,
+            expanded_parametric: vec![false],
+            parametric_equations: vec![ParametricEquationEditor::example()],
             parametric_error: None,
             merge_enabled: false,
             merge_mass_threshold: 1e10,
@@ -48,6 +95,11 @@ impl Editor {
         let n = particles.particles.len();
         if self.expanded_particles.len() < n {
             self.expanded_particles.resize(n, false);
+        }
+
+        let n_parametric = self.parametric_equations.len();
+        if self.expanded_parametric.len() < n_parametric {
+            self.expanded_parametric.resize(n_parametric, false);
         }
 
         let panel_response = egui::SidePanel::left("editor_panel")
@@ -145,7 +197,20 @@ impl Editor {
                 ui.end_row();
 
                 ui.label("Use parametric");
-                ui.checkbox(&mut particles.use_parametric, "");
+                let was_parametric = particles.use_parametric;
+                if ui.checkbox(&mut particles.use_parametric, "").changed() {
+                    // Unhide everything on mode switch; re-hide unused if entering parametric
+                    for p in &mut particles.particles {
+                        p.hidden = false;
+                    }
+                    if particles.use_parametric {
+                        let used: usize = particles.parametric_equations.iter().map(|eq| eq.particle_indices.len()).sum();
+                        for i in used..particles.particles.len() {
+                            particles.particles[i].hidden = true;
+                        }
+                    }
+                }
+                let _ = was_parametric;
                 ui.end_row();
             });
 
@@ -235,10 +300,16 @@ impl Editor {
 
         for i in 0..particles.particles.len() {
             let expanded = *self.expanded_particles.get(i).unwrap_or(&false);
+            let is_hidden = particles.particles[i].hidden;
 
             ui.horizontal(|ui| {
                 let row_label = format!("Particle {}", i + 1);
-                if ui.selectable_label(expanded, row_label).clicked() {
+                let text_color = if is_hidden {
+                    egui::Color32::from_gray(128)
+                } else {
+                    egui::Color32::LIGHT_GRAY
+                };
+                if ui.selectable_label(expanded, egui::RichText::new(&row_label).color(text_color)).clicked() {
                     if let Some(slot) = self.expanded_particles.get_mut(i) {
                         *slot = !*slot;
                     }
@@ -301,6 +372,11 @@ impl Editor {
                     {
                         p.color = Color::new(rgba[0], rgba[1], rgba[2], rgba[3]);
                     }
+
+                    ui.horizontal(|ui| {
+                        ui.label("Hidden");
+                        ui.checkbox(&mut p.hidden, "");
+                    });
                 });
                 ui.separator();
             }
@@ -317,35 +393,124 @@ impl Editor {
     fn draw_parametric(&mut self, ui: &mut egui::Ui, particles: &mut Particles, state: &mut State) {
         let mut changed = false;
 
-        egui::Grid::new("parametric_grid")
-            .num_columns(2)
-            .spacing([8.0, 6.0])
-            .show(ui, |ui| {
-                ui.label("x =");
-                changed |= draw_parametric_row(ui, &mut self.x_expr, self.x_expr_error, "e.g. sin(t)");
-                ui.end_row();
+        ui.horizontal(|ui| {
+            if ui.button("+ Add Equation").clicked() {
+                self.parametric_equations.push(ParametricEquationEditor::default());
+                self.expanded_parametric.push(false);
+                changed = true;
+            }
+            if !self.parametric_equations.is_empty() && ui.button("Delete All").clicked() {
+                self.parametric_equations.clear();
+                self.expanded_parametric.clear();
+                changed = true;
+            }
+        });
 
-                ui.label("y =");
-                changed |= draw_parametric_row(ui, &mut self.y_expr, self.y_expr_error, "e.g. cos(t)");
-                ui.end_row();
+        ui.separator();
 
-                ui.label("z =");
-                changed |= draw_parametric_row(ui, &mut self.z_expr, self.z_expr_error, "e.g. t");
-                ui.end_row();
+        let mut to_delete: Option<usize> = None;
 
-                ui.label("Spread = ");
-                changed |= draw_parametric_row(ui, &mut self.spread_expr, self.spread_expr_error, "e.g. 0.1");
-                ui.end_row();
+        for i in 0..self.parametric_equations.len() {
+            let expanded = *self.expanded_parametric.get(i).unwrap_or(&false);
+            let is_running = self.parametric_equations[i].running;
+            let is_hidden = self.parametric_equations[i].hidden;
+
+            ui.horizontal(|ui| {
+                let label_color = if is_hidden {
+                    egui::Color32::from_gray(110)
+                } else {
+                    egui::Color32::LIGHT_GRAY
+                };
+                let row_label = egui::RichText::new(format!("Equation {}", i + 1)).color(label_color);
+                if ui.selectable_label(expanded, row_label).clicked() {
+                    if let Some(slot) = self.expanded_parametric.get_mut(i) {
+                        *slot = !*slot;
+                    }
+                }
+
+                let play_label = if is_running { "⏸" } else { "▶" };
+                if ui.small_button(play_label).clicked() {
+                    self.parametric_equations[i].running = !self.parametric_equations[i].running;
+                    changed = true;
+                }
+
+                let hide_label = if is_hidden { "👁" } else { "🚫" };
+                if ui.small_button(hide_label).clicked() {
+                    self.parametric_equations[i].hidden = !self.parametric_equations[i].hidden;
+                    changed = true;
+                }
+
+                if ui.small_button("X").clicked() {
+                    to_delete = Some(i);
+                }
             });
 
+            if expanded {
+                ui.indent(("parametric_props", i), |ui| {
+                    let eq = &mut self.parametric_equations[i];
+
+                    egui::Grid::new(("parametric_grid", i))
+                        .num_columns(2)
+                        .spacing([8.0, 6.0])
+                        .show(ui, |ui| {
+                            ui.label("Particles");
+                            if ui.add(egui::DragValue::new(&mut eq.num_particles).speed(1).range(1..=10000)).changed() {
+                                changed = true;
+                            }
+                            ui.end_row();
+
+                            ui.label("x =");
+                            changed |= draw_parametric_row(ui, &mut eq.x_expr, eq.x_expr_error, "e.g. sin(t)");
+                            ui.end_row();
+
+                            ui.label("y =");
+                            changed |= draw_parametric_row(ui, &mut eq.y_expr, eq.y_expr_error, "e.g. cos(t)");
+                            ui.end_row();
+
+                            ui.label("z =");
+                            changed |= draw_parametric_row(ui, &mut eq.z_expr, eq.z_expr_error, "e.g. t");
+                            ui.end_row();
+
+                            ui.label("Spread = ");
+                            changed |= draw_parametric_row(ui, &mut eq.spread_expr, eq.spread_expr_error, "e.g. 0.1");
+                            ui.end_row();
+
+                            ui.label("Period = ");
+                            changed |= draw_parametric_row(ui, &mut eq.period_expr, eq.period_expr_error, "e.g. 10.0");
+                            ui.end_row();
+                        });
+
+                    if let Some(error) = &eq.error {
+                        ui.colored_label(egui::Color32::RED, error);
+                    }
+
+                    if eq.period_expr_error {
+                        ui.colored_label(egui::Color32::RED, "Invalid period expression");
+                    }
+                });
+
+                ui.separator();
+            }
+        }
+
+        if let Some(idx) = to_delete {
+            self.parametric_equations.remove(idx);
+            if idx < self.expanded_parametric.len() {
+                self.expanded_parametric.remove(idx);
+            }
+            changed = true;
+        }
+
         if changed {
-            self.try_compile_parametric(particles, state);
+            match self.try_compile_parametric(particles) {
+                Ok(()) => state.events.push(Event::Alert("Parametric equations updated".to_string())),
+                Err(()) => {}
+            }
         }
 
         if let Some(error) = &self.parametric_error {
             ui.colored_label(egui::Color32::RED, error);
         }
-        ui.label("Variables:\n- t: elapsed time\n- x: current x position\n- y: current y position\n- z: current z position");
     }
 
     fn draw_help(&self, ui: &mut egui::Ui) {
@@ -377,45 +542,127 @@ impl Editor {
         ui.label("Slow camera speed: F3");
         ui.separator();
         ui.label("Speed up camera speed: F4");
+        ui.separator();
+        ui.add_space(10.0);
+        ui.label("Parametric equations:");
+        ui.label("Particles: the number of particles assigned to each parametric equation");
+        ui.label("X, Y, Z: the parametric equations for the particle positions. These equations are functions of time t and the particle's current position (x, y, z).");
+        ui.label("Spread: the time offset between particles in the same equation");
+        ui.label("Period: the period of the parametric equation (0 for no period)");
+
     }
 
-    pub fn try_compile_parametric(&mut self, particles: &mut Particles, state: &mut State) {
-        let x_fn_result = compile_parametric_fn(&self.x_expr);
-        self.x_expr_error = x_fn_result.is_err();
-        let y_fn_result = compile_parametric_fn(&self.y_expr);
-        self.y_expr_error = y_fn_result.is_err();
-        let z_fn_result = compile_parametric_fn(&self.z_expr);
-        self.z_expr_error = z_fn_result.is_err();
-
-        let spread = self.spread_expr.parse::<f64>().unwrap_or(0.0);
-        self.spread_expr_error = spread.is_nan() || spread.is_infinite() || spread < 0.0;
-        if self.spread_expr_error {
-            self.parametric_error = Some("Spread must be a non-negative number".to_string());
-            return;
+    pub fn try_compile_parametric(&mut self, particles: &mut Particles) -> Result<(), ()> {
+        // First pass: validate num_particles and check total doesn't exceed available
+        let total_particles_requested: usize = self.parametric_equations.iter().map(|eq| eq.num_particles).sum();
+        
+        if total_particles_requested > particles.particles.len() {
+            self.parametric_error = Some(format!("Total particles requested ({}) exceeds available ({})", total_particles_requested, particles.particles.len()));
+            return Err(());
         }
 
-        if self.x_expr_error {
-            self.parametric_error = Some(format!("x: {}", x_fn_result.err().unwrap()));
-        } else if self.y_expr_error {
-            self.parametric_error = Some(format!("y: {}", y_fn_result.err().unwrap()));
-        } else if self.z_expr_error {
-            self.parametric_error = Some(format!("z: {}", z_fn_result.err().unwrap()));
-        } else if self.spread_expr_error {
-            self.parametric_error = Some("Spread: Invalid number".to_string());
-        } else {
-            self.parametric_error = None;
-            let was_none = particles.parametric_equations.is_none();
-            particles.parametric_equations = Some(ParametricEquations {
+        // Unhide all particles first so that removed/resized equations don't leave particles stuck hidden.
+        // Only do this in parametric mode — in simulation mode the user controls hidden state manually.
+        if particles.use_parametric {
+            for p in &mut particles.particles {
+                p.hidden = false;
+            }
+        }
+
+        let mut compiled: Vec<ParametricEquations> = Vec::with_capacity(self.parametric_equations.len());
+        let mut particle_offset = 0;
+        let mut has_errors = false;
+
+        for eq in &mut self.parametric_equations {
+            let x_fn_result = compile_parametric_fn(&eq.x_expr);
+            eq.x_expr_error = x_fn_result.is_err();
+
+            let y_fn_result = compile_parametric_fn(&eq.y_expr);
+            eq.y_expr_error = y_fn_result.is_err();
+
+            let z_fn_result = compile_parametric_fn(&eq.z_expr);
+            eq.z_expr_error = z_fn_result.is_err();
+
+            let (spread, spread_parse_failed) = match eq.spread_expr.parse::<f64>() {
+                Ok(value) => (value, false),
+                Err(_) => (0.0, true),
+            };
+            eq.spread_expr_error = spread_parse_failed || spread.is_nan() || spread.is_infinite() || spread < 0.0;
+
+            let (period, period_parse_failed) = match eq.period_expr.parse::<f64>() {
+                Ok(value) => (value, false),
+                Err(_) => (0.0, true),
+            };
+            eq.period_expr_error = period_parse_failed || period.is_nan() || period.is_infinite() || period < 0.0;
+
+
+            if eq.x_expr_error {
+                eq.error = Some(format!("x: {}", x_fn_result.err().unwrap()));
+                has_errors = true;
+                continue;
+            }
+            if eq.y_expr_error {
+                eq.error = Some(format!("y: {}", y_fn_result.err().unwrap()));
+                has_errors = true;
+                continue;
+            }
+            if eq.z_expr_error {
+                eq.error = Some(format!("z: {}", z_fn_result.err().unwrap()));
+                has_errors = true;
+                continue;
+            }
+            if eq.spread_expr_error {
+                eq.error = Some("Spread must be a non-negative number".to_string());
+                has_errors = true;
+                continue;
+            }
+            if eq.period_expr_error {
+                eq.error = Some("Period must be a non-negative number".to_string());
+                has_errors = true;
+                continue;
+            }
+
+            // Allocate particle indices sequentially
+            let particle_indices: Vec<usize> = (particle_offset..particle_offset + eq.num_particles).collect();
+            particle_offset += eq.num_particles;
+
+            // Apply hidden state to the assigned particles
+            if eq.hidden {
+                for &idx in &particle_indices {
+                    if idx < particles.particles.len() {
+                        particles.particles[idx].hidden = true;
+                    }
+                }
+            }
+
+            eq.error = None;
+            compiled.push(ParametricEquations {
                 x_fn: x_fn_result.unwrap(),
                 y_fn: y_fn_result.unwrap(),
                 z_fn: z_fn_result.unwrap(),
                 spread,
+                particle_indices,
+                running: eq.running,
+                period,
             });
-            
-            if !was_none {
-                state.events.push(Event::Alert("Parametric equations updated".to_string()));
+        }
+
+        if has_errors {
+            self.parametric_error = Some("Fix equation errors above".to_string());
+            return Err(());
+        }
+
+        self.parametric_error = None;
+        particles.parametric_equations = compiled;
+
+        // Hide particles not claimed by any equation, but only when actively in parametric mode
+        if particles.use_parametric {
+            for i in particle_offset..particles.particles.len() {
+                particles.particles[i].hidden = true;
             }
         }
+
+        Ok(())
     }
 }
 

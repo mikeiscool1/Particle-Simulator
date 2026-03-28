@@ -119,6 +119,7 @@ fn merge_particles(particles: &mut Vec<Particle>, i: usize, j: usize) {
         radius,
         color,
         trail: VecDeque::new(),
+        hidden: false,
     };
 
     particles.swap_remove(j);

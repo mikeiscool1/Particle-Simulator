@@ -13,19 +13,31 @@ pub struct ParametricEquations {
     pub y_fn: ParametricFn,
     pub z_fn: ParametricFn,
     pub spread: f64,
+    pub period: f64,
+    pub particle_indices: Vec<usize>,
+    pub running: bool,
 }
 
 impl ParametricEquations {
     pub fn apply_to_particles(&self, particles: &mut [Particle], t: f32) {
-        for (i, p) in particles.iter_mut().enumerate() {
-            let t = t as f64 + i as f64 * self.spread;
-            let x = p.pos.x as f64;
-            let y = p.pos.y as f64;
-            let z = p.pos.z as f64;
+        if !self.running {
+            return;
+        }
+        for (i, &idx) in self.particle_indices.iter().enumerate() {
+            if idx < particles.len() {
+                let p = &mut particles[idx];
+                let t= match self.period {
+                    0.0 => t as f64 + i as f64 * self.spread,
+                    _ => (t as f64 + i as f64 * self.spread) % self.period,
+                };
+                let x = p.pos.x as f64;
+                let y = p.pos.y as f64;
+                let z = p.pos.z as f64;
 
-            p.pos.x = (self.x_fn)(t, x, y, z) as f32;
-            p.pos.y = (self.y_fn)(t, x, y, z) as f32;
-            p.pos.z = (self.z_fn)(t, x, y, z) as f32;
+                p.pos.x = (self.x_fn)(t, x, y, z) as f32;
+                p.pos.y = (self.y_fn)(t, x, y, z) as f32;
+                p.pos.z = (self.z_fn)(t, x, y, z) as f32;
+            }
         }
     }
 }
@@ -45,7 +57,8 @@ pub struct Particle {
     pub friction: f32,
     pub radius: f32,
     pub color: Color,
-    pub trail: VecDeque<Vec3>
+    pub trail: VecDeque<Vec3>,
+    pub hidden: bool,
 }
 
 impl Particle {
@@ -77,6 +90,7 @@ impl Default for Particle {
             radius: 0.1,
             color: RED,
             trail: VecDeque::new(),
+            hidden: false,
         }
     }
 }
@@ -89,7 +103,7 @@ pub struct Particles {
     pub g: f32,
     pub use_parametric: bool,
     pub time: f32,
-    pub parametric_equations: Option<ParametricEquations>,
+    pub parametric_equations: Vec<ParametricEquations>,
     pub particles: Vec<Particle>,
 }
 
@@ -101,14 +115,18 @@ impl Particles {
         let old_acc: Vec<Vec3> = self.particles.iter().map(|p| p.acc).collect();
 
         for p in self.particles.iter_mut() {
-            p.verlet_drift(dt);
+            if !p.hidden {
+                p.verlet_drift(dt);
+            }
         }
 
         resolve_collisions(&mut self.particles, self.restitution, self.min_merge_mass, self.g);
         n_body_update(&mut self.particles, self.g);
 
         for (p, &prev_acc) in self.particles.iter_mut().zip(old_acc.iter()) {
-            p.verlet_kick(prev_acc, dt);
+            if !p.hidden {
+                p.verlet_kick(prev_acc, dt);
+            }
         }
     }
 }
@@ -116,6 +134,9 @@ impl Particles {
 impl Component for Particles {
     fn draw(&self, _state: &State) {
         for p in &self.particles {
+            if p.hidden {
+                continue;
+            }
             if self.use_cubes {
                 draw_cube(p.pos, vec3(p.radius * 2.0, p.radius * 2.0, p.radius * 2.0), None, p.color);
             } else {
@@ -125,6 +146,9 @@ impl Component for Particles {
 
         if self.show_trail {
             for p in &self.particles {
+                if p.hidden {
+                    continue;
+                }
                 for i in 1..p.trail.len() {
                     let a = p.trail[i - 1];
                     let b = p.trail[i];
@@ -157,6 +181,17 @@ impl Component for Particles {
         }
         if is_key_pressed(KeyCode::Slash) {
             self.use_parametric = !self.use_parametric;
+            // Always unhide everything first
+            for p in &mut self.particles {
+                p.hidden = false;
+            }
+            if self.use_parametric {
+                // Hide particles not claimed by any equation
+                let used: usize = self.parametric_equations.iter().map(|eq| eq.particle_indices.len()).sum();
+                for i in used..self.particles.len() {
+                    self.particles[i].hidden = true;
+                }
+            }
             alert_msg = format!("Parametric Mode: {}", if self.use_parametric { "On" } else { "Off" });
         }
 
@@ -173,7 +208,7 @@ impl Component for Particles {
         let sim_dt = dt * state.time_warp;
 
         if self.use_parametric {
-            if let Some(parametric) = &self.parametric_equations {
+            for parametric in &self.parametric_equations {
                 parametric.apply_to_particles(&mut self.particles, self.time);
             }
         } else {
@@ -182,7 +217,11 @@ impl Component for Particles {
             );
         }
 
-        for p in self.particles.iter_mut() { p.update_trail(); }
+        for p in self.particles.iter_mut() {
+            if !p.hidden {
+                p.update_trail();
+            }
+        }
     }
 }
 

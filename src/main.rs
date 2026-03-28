@@ -64,7 +64,7 @@ async fn main() {
         g: 6.67430e-11,
         use_parametric: false,
         time: 0.0,
-        parametric_equations: None,
+        parametric_equations: Vec::new(),
     };
     set_particles(&mut particles.particles);
 
@@ -73,7 +73,7 @@ async fn main() {
     let mut fps = component::FPS { visible: false, last_update_time: 0.0, fps: get_fps() };
     let mut editor = Editor::new(true);
 
-    editor.try_compile_parametric(&mut particles, &mut state);
+    let _ = editor.try_compile_parametric(&mut particles);
 
     loop {
         let dt = get_frame_time();
