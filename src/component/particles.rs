@@ -114,6 +114,7 @@ pub struct Particle {
     pub acc: Vec3,
     pub mass: f32,
     pub friction: f32,
+    pub restitution: f32,
     pub radius: f32,
     pub color: Color,
     pub trail: VecDeque<Vec3>,
@@ -146,6 +147,7 @@ impl Default for Particle {
             acc: Vec3::ZERO,
             mass: 0.0,
             friction: 0.0,
+            restitution: 0.5,
             radius: 0.1,
             color: RED,
             trail: VecDeque::new(),
@@ -158,7 +160,6 @@ pub struct Particles {
     pub show_trail: bool,
     pub use_cubes: bool,
     pub min_merge_mass: f32,
-    pub restitution: f32,
     pub g: f32,
     pub use_parametric: bool,
     pub time: f32,
@@ -179,7 +180,7 @@ impl Particles {
             }
         }
 
-        resolve_collisions(&mut self.particles, self.restitution, self.min_merge_mass, self.g);
+        resolve_collisions(&mut self.particles, self.min_merge_mass, self.g);
         n_body_update(&mut self.particles, self.g);
 
         for (p, &prev_acc) in self.particles.iter_mut().zip(old_acc.iter()) {

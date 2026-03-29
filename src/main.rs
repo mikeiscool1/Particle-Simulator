@@ -62,7 +62,6 @@ async fn main() {
         show_trail: true, 
         use_cubes: true,
         min_merge_mass: f32::INFINITY,
-        restitution: 0.5,
         g: 6.67430e-11,
         use_parametric: false,
         time: 0.0,

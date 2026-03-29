@@ -263,14 +263,6 @@ impl Editor {
             .num_columns(2)
             .spacing([8.0, 4.0])
             .show(ui, |ui| {
-                ui.label("Restitution");
-                ui.add(
-                    egui::DragValue::new(&mut particles.restitution)
-                        .speed(0.005)
-                        .range(0.0..=1.0_f32),
-                );
-                ui.end_row();
-
                 ui.label("Gravity (G)");
                 ui.add(
                     egui::DragValue::new(&mut particles.g)
@@ -405,6 +397,14 @@ impl Editor {
                             .speed(0.005)
                             .range(0.0..=1.0_f32),
                     );
+
+                    ui.label("Restitution");
+                    ui.add(
+                        egui::DragValue::new(&mut p.restitution)
+                            .speed(0.005)
+                            .range(0.0..=1.0_f32),
+                    );
+
 
                     ui.label("Color");
                     let mut rgba = [p.color.r, p.color.g, p.color.b, p.color.a];

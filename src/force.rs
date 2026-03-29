@@ -2,7 +2,7 @@ use macroquad::prelude::*;
 use crate::component::Particle;
 use std::collections::VecDeque;
 
-pub fn resolve_collisions(particles: &mut Vec<Particle>, restitution: f32, min_merge_mass: f32, g: f32) {
+pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g: f32) {
     let mut i = 0;
     while i < particles.len() {
         if particles[i].mass <= 0.0 {
@@ -59,7 +59,8 @@ pub fn resolve_collisions(particles: &mut Vec<Particle>, restitution: f32, min_m
                     let m1 = particles[i].mass;
                     let m2 = particles[j].mass;
                     let inv_mass_sum = 1.0 / m1 + 1.0 / m2;
-                    let normal_impulse = -(1.0 + restitution) * relative_speed_normal / inv_mass_sum;
+                    let e = (particles[i].restitution + particles[j].restitution) / 2.0;
+                    let normal_impulse = -(1.0 + e) * relative_speed_normal / inv_mass_sum;
 
                     particles[i].vel -= normal * (normal_impulse / m1);
                     particles[j].vel += normal * (normal_impulse / m2);
@@ -98,6 +99,7 @@ fn merge_particles(particles: &mut Vec<Particle>, i: usize, j: usize) {
     let pos = (p1.pos * p1.mass + p2.pos * p2.mass) / total_mass;
     let vel = (p1.vel * p1.mass + p2.vel * p2.mass) / total_mass;
     let friction = (p1.friction * p1.mass + p2.friction * p2.mass) / total_mass;
+    let restitution = (p1.restitution * p1.mass + p2.restitution * p2.mass) / total_mass;
     let radius = (p1.radius.powi(3) + p2.radius.powi(3)).cbrt();
 
     let r_total = (p1.radius + p2.radius).max(1e-6);
@@ -120,6 +122,7 @@ fn merge_particles(particles: &mut Vec<Particle>, i: usize, j: usize) {
         color,
         trail: VecDeque::new(),
         hidden: false,
+        restitution,
     };
 
     particles.swap_remove(j);
