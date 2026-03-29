@@ -104,7 +104,9 @@ async fn main() {
                 component::Event::ResetSimulation => {
                     state.clock_running = false;
                     particles.time = 0.0;
-                    set_particles(&mut particles.particles);
+                    if !particles.use_parametric {
+                        set_particles(&mut particles.particles);
+                    }
                     alert.alert("Simulation Reset");
                 }
             }

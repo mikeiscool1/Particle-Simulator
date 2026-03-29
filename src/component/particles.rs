@@ -6,7 +6,7 @@ use crate::force::{resolve_collisions, n_body_update};
 use crate::component::{Component, Event};
 use crate::State;
 
-type ParametricFn = Box<dyn Fn(f64, f64, f64, f64) -> f64>;
+type ParametricFn = Box<dyn Fn(f64, f64, f64, f64, f64) -> f64>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DomainLoopDirection {
@@ -54,13 +54,18 @@ impl ParametricEquations {
                         }
                     }
                 };
+                
                 let x = p.pos.x as f64;
                 let y = p.pos.y as f64;
                 let z = p.pos.z as f64;
 
-                p.pos.x = (self.x_fn)(t, x, y, z) as f32;
-                p.pos.y = (self.y_fn)(t, x, y, z) as f32;
-                p.pos.z = (self.z_fn)(t, x, y, z) as f32;
+                let new_x = (self.x_fn)(t, i as f64, x, y, z) as f32;
+                let new_y = (self.y_fn)(t, i as f64, x, y, z) as f32;
+                let new_z = (self.z_fn)(t, i as f64, x, y, z) as f32;
+
+                p.pos.x = new_x;
+                p.pos.y = new_y;
+                p.pos.z = new_z;
             }
         }
     }
@@ -68,21 +73,27 @@ impl ParametricEquations {
 
 pub fn insert_implicit_mul(expr: &str) -> String {
     let chars: Vec<char> = expr.chars().filter(|c| !c.is_whitespace()).collect();
-    let mut out = String::new();
+    let mut out = String::with_capacity(chars.len() * 2);
 
-    for i in 0..chars.len() {
-        out.push(chars[i]);
-        if i + 1 >= chars.len() { continue; }
+    for pair in chars.windows(2) {
+        let (cur, next) = (pair[0], pair[1]);
+        out.push(cur);
 
-        let cur = chars[i];
-        let next = chars[i + 1];
+        let needs_mul = match (cur, next) {
+            // 5t, 5(, t5, t(, )5, )t, )(
+            ('0'..='9', 'a'..='z' | 'A'..='Z' | '(') => true,
+            ('a'..='z' | 'A'..='Z' | ')', '0'..='9') => true,
+            (')', 'a'..='z' | 'A'..='Z' | '(') => true,
+            _ => false,
+        };
 
-        if cur.is_ascii_digit() && (next.is_ascii_alphabetic() || next == '(')  {
+        if needs_mul {
             out.push('*');
         }
-        if (cur.is_ascii_alphabetic() || cur == ')') && next.is_ascii_digit() {
-            out.push('*');
-        }
+    }
+
+    if let Some(&last) = chars.last() {
+        out.push(last);
     }
 
     out
@@ -92,8 +103,8 @@ pub fn compile_parametric_fn(src: &str) -> Result<ParametricFn, String> {
     let src = insert_implicit_mul(src);
 
     let expr = src.parse::<Expr>().map_err(|e| e.to_string())?;
-    let func = expr.bind4("t", "x", "y", "z").map_err(|e| e.to_string())?;
-    Ok(Box::new(move |t: f64, x: f64, y: f64, z: f64| func(t, x, y, z)))
+    let func = expr.bind5("t", "i", "x", "y", "z").map_err(|e| e.to_string())?;
+    Ok(Box::new(move |t: f64, i: f64, x: f64, y: f64, z: f64| func(t, i, x, y, z)))
 }
 
 #[derive(Debug, Clone)]
