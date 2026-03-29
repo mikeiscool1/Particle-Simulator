@@ -8,12 +8,19 @@ use crate::State;
 
 type ParametricFn = Box<dyn Fn(f64, f64, f64, f64) -> f64>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DomainLoopDirection {
+    Wrap,
+    PingPong,
+}
+
 pub struct ParametricEquations {
     pub x_fn: ParametricFn,
     pub y_fn: ParametricFn,
     pub z_fn: ParametricFn,
     pub spread: f64,
-    pub period: f64,
+    pub domain: Option<(f64, f64)>,
+    pub domain_direction: DomainLoopDirection,
     pub particle_indices: Vec<usize>,
     pub running: bool,
 }
@@ -26,9 +33,26 @@ impl ParametricEquations {
         for (i, &idx) in self.particle_indices.iter().enumerate() {
             if idx < particles.len() {
                 let p = &mut particles[idx];
-                let t= match self.period {
-                    0.0 => t as f64 + i as f64 * self.spread,
-                    _ => (t as f64 + i as f64 * self.spread) % self.period,
+                let raw_t = t as f64 + i as f64 * self.spread;
+                let t = match self.domain {
+                    None => raw_t,
+                    Some((domain_min, domain_max)) => {
+                        let domain_size = domain_max - domain_min;
+                        match self.domain_direction {
+                            DomainLoopDirection::Wrap => {
+                                (raw_t - domain_min).rem_euclid(domain_size) + domain_min
+                            }
+                            DomainLoopDirection::PingPong => {
+                                let cycle = domain_size * 2.0;
+                                let phase = (raw_t - domain_min).rem_euclid(cycle);
+                                if phase <= domain_size {
+                                    domain_min + phase
+                                } else {
+                                    domain_max - (phase - domain_size)
+                                }
+                            }
+                        }
+                    }
                 };
                 let x = p.pos.x as f64;
                 let y = p.pos.y as f64;

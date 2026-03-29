@@ -1,7 +1,7 @@
 use egui_macroquad::egui;
 use macroquad::prelude::*;
 
-use crate::component::{Component, Event, particles::{ParametricEquations, Particle, Particles, compile_parametric_fn}};
+use crate::component::{Component, Event, particles::{DomainLoopDirection, ParametricEquations, Particle, Particles, compile_parametric_fn}};
 use crate::State;
 
 struct ParametricEquationEditor {
@@ -13,8 +13,12 @@ struct ParametricEquationEditor {
     y_expr_error: bool,
     z_expr_error: bool,
     spread_expr_error: bool,
-    period_expr: String,
-    period_expr_error: bool,
+    use_domain: bool,
+    domain_lower_expr: String,
+    domain_upper_expr: String,
+    domain_lower_expr_error: bool,
+    domain_upper_expr_error: bool,
+    domain_direction: DomainLoopDirection,
     error: Option<String>,
     num_particles: usize,
     running: bool,
@@ -32,9 +36,13 @@ impl Default for ParametricEquationEditor {
             y_expr_error: false,
             z_expr_error: false,
             spread_expr_error: false,
+            use_domain: true,
             error: None,
-            period_expr: "10.0".to_string(),
-            period_expr_error: false,
+            domain_lower_expr: "0.0".to_string(),
+            domain_upper_expr: "10.0".to_string(),
+            domain_lower_expr_error: false,
+            domain_upper_expr_error: false,
+            domain_direction: DomainLoopDirection::Wrap,
             num_particles: 10,
             running: true,
             hidden: false,
@@ -53,9 +61,13 @@ impl ParametricEquationEditor {
             y_expr_error: false,
             z_expr_error: false,
             spread_expr_error: false,
+            use_domain: false,
             error: None,
-            period_expr: "0".to_string(),
-            period_expr_error: false,
+            domain_lower_expr: "0.0".to_string(),
+            domain_upper_expr: "10.0".to_string(),
+            domain_lower_expr_error: false,
+            domain_upper_expr_error: false,
+            domain_direction: DomainLoopDirection::Wrap,
             num_particles: 1000,
             running: true,
             hidden: false,
@@ -505,17 +517,44 @@ impl Editor {
                             changed |= draw_parametric_row(ui, &mut eq.spread_expr, eq.spread_expr_error, "e.g. 0.1");
                             ui.end_row();
 
-                            ui.label("Period = ");
-                            changed |= draw_parametric_row(ui, &mut eq.period_expr, eq.period_expr_error, "e.g. 10.0");
+                            ui.label("Use Domain");
+                            changed |= ui.checkbox(&mut eq.use_domain, "").changed();
                             ui.end_row();
+
+                            if eq.use_domain {
+                                ui.label("Min = ");
+                                changed |= draw_parametric_row(ui, &mut eq.domain_lower_expr, eq.domain_lower_expr_error, "0.0");
+                                ui.end_row();
+
+                                ui.label("Max = ");
+                                changed |= draw_parametric_row(ui, &mut eq.domain_upper_expr, eq.domain_upper_expr_error, "10.0");
+                                ui.end_row();
+
+                                ui.label("Direction");
+                                let direction_text = match eq.domain_direction {
+                                    DomainLoopDirection::Wrap => "Wrap",
+                                    DomainLoopDirection::PingPong => "Ping Pong",
+                                };
+                                egui::ComboBox::from_id_salt(("domain_direction", i))
+                                    .selected_text(direction_text)
+                                    .show_ui(ui, |ui| {
+                                        changed |= ui
+                                            .selectable_value(&mut eq.domain_direction, DomainLoopDirection::Wrap, "Wrap")
+                                            .changed();
+                                        changed |= ui
+                                            .selectable_value(&mut eq.domain_direction, DomainLoopDirection::PingPong, "Ping Pong")
+                                            .changed();
+                                    });
+                                ui.end_row();
+                            }
                         });
 
                     if let Some(error) = &eq.error {
                         ui.colored_label(egui::Color32::RED, error);
                     }
 
-                    if eq.period_expr_error {
-                        ui.colored_label(egui::Color32::RED, "Invalid period expression");
+                    if eq.use_domain && (eq.domain_lower_expr_error || eq.domain_upper_expr_error) {
+                        ui.colored_label(egui::Color32::RED, "Invalid domain bounds");
                     }
                 });
 
@@ -578,8 +617,10 @@ impl Editor {
         ui.label("Particles: the number of particles assigned to each parametric equation");
         ui.label("X, Y, Z: the parametric equations for the particle positions. These equations are functions of time t and the particle's current position (x, y, z).");
         ui.label("Spread: the time offset between particles in the same equation");
-        ui.label("Period: the period of the parametric equation (0 for no period)");
-
+        ui.label("Use Domain: enables/disables domain looping.");
+        ui.label("Domain [min, max]: the range of the parameter t over which the equation is evaluated.");
+        ui.label("Direction: Wrap jumps from max back to min. Ping Pong goes back and forth between min and max.");
+        ui.add_space(10.0);
     }
 
     pub fn try_compile_parametric(&mut self, particles: &mut Particles) -> Result<(), ()> {
@@ -613,17 +654,36 @@ impl Editor {
             let z_fn_result = compile_parametric_fn(&eq.z_expr);
             eq.z_expr_error = z_fn_result.is_err();
 
-            let (spread, spread_parse_failed) = match eq.spread_expr.parse::<f64>() {
+            let (spread, spread_parse_failed) = match eval_constant_expr(&eq.spread_expr) {
                 Ok(value) => (value, false),
                 Err(_) => (0.0, true),
             };
             eq.spread_expr_error = spread_parse_failed || spread.is_nan() || spread.is_infinite() || spread < 0.0;
 
-            let (period, period_parse_failed) = match eq.period_expr.parse::<f64>() {
-                Ok(value) => (value, false),
-                Err(_) => (0.0, true),
+            let mut invalid_domain_bounds = false;
+            let domain = if eq.use_domain {
+                let (domain_lower, domain_lower_parse_failed) = match eval_constant_expr(&eq.domain_lower_expr) {
+                    Ok(value) => (value, false),
+                    Err(_) => (0.0, true),
+                };
+
+                let (domain_upper, domain_upper_parse_failed) = match eval_constant_expr(&eq.domain_upper_expr) {
+                    Ok(value) => (value, false),
+                    Err(_) => (0.0, true),
+                };
+
+                eq.domain_lower_expr_error = domain_lower_parse_failed || domain_lower.is_nan() || domain_lower.is_infinite();
+                eq.domain_upper_expr_error = domain_upper_parse_failed || domain_upper.is_nan() || domain_upper.is_infinite();
+                invalid_domain_bounds = eq.domain_lower_expr_error
+                    || eq.domain_upper_expr_error
+                    || domain_upper <= domain_lower;
+
+                Some((domain_lower, domain_upper))
+            } else {
+                eq.domain_lower_expr_error = false;
+                eq.domain_upper_expr_error = false;
+                None
             };
-            eq.period_expr_error = period_parse_failed || period.is_nan() || period.is_infinite() || period < 0.0;
 
 
             if eq.x_expr_error {
@@ -646,8 +706,8 @@ impl Editor {
                 has_errors = true;
                 continue;
             }
-            if eq.period_expr_error {
-                eq.error = Some("Period must be a non-negative number".to_string());
+            if invalid_domain_bounds {
+                eq.error = Some("Domain must be finite and satisfy max > min".to_string());
                 has_errors = true;
                 continue;
             }
@@ -673,7 +733,8 @@ impl Editor {
                 spread,
                 particle_indices,
                 running: eq.running,
-                period,
+                domain,
+                domain_direction: eq.domain_direction,
             });
         }
 
@@ -715,6 +776,10 @@ fn draw_parametric_row(ui: &mut egui::Ui, expr: &mut String, has_error: bool, hi
         })
         .inner
         .changed()
+}
+
+fn eval_constant_expr(expr: &str) -> Result<f64, String> {
+    meval::eval_str(expr).map_err(|err| err.to_string())
 }
 
 
