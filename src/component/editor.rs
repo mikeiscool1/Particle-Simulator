@@ -53,9 +53,9 @@ impl Default for ParametricEquationEditor {
 impl ParametricEquationEditor {
     fn example() -> Self {
         Self {
-            x_expr: "3 * sin(t)".to_string(),
-            y_expr: "2 * sin(2 * t)".to_string(),
-            z_expr: "sin(3 * t)".to_string(),
+            x_expr: "3sin(t)".to_string(),
+            y_expr: "2sin(2t)".to_string(),
+            z_expr: "sin(3t)".to_string(),
             spread_expr: "0.01".to_string(),
             x_expr_error: false,
             y_expr_error: false,

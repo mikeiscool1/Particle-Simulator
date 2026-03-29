@@ -80,6 +80,12 @@ pub fn handle_input(state: &mut State, dt: f32) {
         state.last_mouse = None;
     }
 
+    // Arrow key look
+    if is_key_down(KeyCode::Up) { state.pitch += 2.0*sensitivity; }
+    if is_key_down(KeyCode::Down) { state.pitch -= 2.0*sensitivity; }
+    if is_key_down(KeyCode::Left) { state.yaw -= 2.0*sensitivity; }
+    if is_key_down(KeyCode::Right) { state.yaw += 2.0*sensitivity; }
+
     // WASDEQ movement
     if is_key_down(KeyCode::W) { state.pos += forward * state.speed * 10.0 * dt; }
     if is_key_down(KeyCode::S) { state.pos -= forward * state.speed * 10.0 * dt; }

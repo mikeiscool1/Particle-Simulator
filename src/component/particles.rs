@@ -66,7 +66,31 @@ impl ParametricEquations {
     }
 }
 
+fn insert_implicit_mul(expr: &str) -> String {
+    let chars: Vec<char> = expr.chars().filter(|c| !c.is_whitespace()).collect();
+    let mut out = String::new();
+
+    for i in 0..chars.len() {
+        out.push(chars[i]);
+        if i + 1 >= chars.len() { continue; }
+
+        let cur = chars[i];
+        let next = chars[i + 1];
+
+        if cur.is_ascii_digit() && (next.is_ascii_alphabetic() || next == '(')  {
+            out.push('*');
+        }
+        if (cur.is_ascii_alphabetic() || cur == ')') && next.is_ascii_digit() {
+            out.push('*');
+        }
+    }
+
+    out
+}
+
 pub fn compile_parametric_fn(src: &str) -> Result<ParametricFn, String> {
+    let src = insert_implicit_mul(src);
+
     let expr = src.parse::<Expr>().map_err(|e| e.to_string())?;
     let func = expr.bind4("t", "x", "y", "z").map_err(|e| e.to_string())?;
     Ok(Box::new(move |t: f64, x: f64, y: f64, z: f64| func(t, x, y, z)))
