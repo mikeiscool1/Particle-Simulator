@@ -1,7 +1,7 @@
 use egui_macroquad::egui;
 use macroquad::prelude::*;
 
-use crate::component::{Component, Event, particles::{DomainLoopDirection, ParametricEquations, Particle, Particles, compile_parametric_fn}};
+use crate::component::{Component, Event, particles::{DomainLoopDirection, ParametricEquations, Particle, Particles, compile_parametric_fn, insert_implicit_mul}};
 use crate::State;
 
 struct ParametricEquationEditor {
@@ -779,6 +779,7 @@ fn draw_parametric_row(ui: &mut egui::Ui, expr: &mut String, has_error: bool, hi
 }
 
 fn eval_constant_expr(expr: &str) -> Result<f64, String> {
+    let expr = insert_implicit_mul(expr);
     meval::eval_str(expr).map_err(|err| err.to_string())
 }
 

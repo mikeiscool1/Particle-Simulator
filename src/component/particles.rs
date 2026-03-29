@@ -66,7 +66,7 @@ impl ParametricEquations {
     }
 }
 
-fn insert_implicit_mul(expr: &str) -> String {
+pub fn insert_implicit_mul(expr: &str) -> String {
     let chars: Vec<char> = expr.chars().filter(|c| !c.is_whitespace()).collect();
     let mut out = String::new();
 
