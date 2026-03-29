@@ -3,13 +3,12 @@ use crate::State;
 use crate::component::{Component, Event};
 
 pub struct Grid {
-    pub visible: bool
 }
 
 impl Component for Grid {
     fn draw(&self, state: &State) {
-        if !self.visible {
-            return;
+        if !state.show_grid {
+            return
         }
 
         let camera_pos = state.camera.position;
@@ -74,8 +73,8 @@ impl Component for Grid {
         }
 
         if is_key_pressed(KeyCode::G) {
-            self.visible = !self.visible;
-            state.events.push(Event::Alert(format!("Grid: {}", if self.visible { "On" } else { "Off" })));
+            state.show_grid = !state.show_grid;
+            state.events.push(Event::Alert(format!("Grid: {}", if state.show_grid { "On" } else { "Off" })));
         }
     }
 

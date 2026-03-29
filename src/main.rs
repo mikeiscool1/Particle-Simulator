@@ -26,6 +26,7 @@ struct State {
     ui_captures_keyboard: bool,
     ui_captures_pointer: bool,
     bg_color: Color,
+    show_grid: bool,
     events: Vec<component::Event>, // Events that components can trigger to communicate with each other
 }
 
@@ -52,6 +53,7 @@ async fn main() {
         ui_captures_keyboard: false,
         ui_captures_pointer: false,
         bg_color: Color::new(0.1, 0.1, 0.15, 1.0),
+        show_grid: false,
         events: Vec::new(),
     };
 
@@ -68,7 +70,7 @@ async fn main() {
     };
     set_particles(&mut particles.particles);
 
-    let mut grid = Grid { visible: false };
+    let mut grid = Grid {};
     let mut alert = Alert::new();
     let mut fps = component::FPS { visible: false, last_update_time: 0.0, fps: get_fps() };
     let mut editor = Editor::new(true);
@@ -105,7 +107,6 @@ async fn main() {
                     set_particles(&mut particles.particles);
                     alert.alert("Simulation Reset");
                 }
-                component::Event::ShowGrid(visible) => grid.visible = visible,
             }
         }
 

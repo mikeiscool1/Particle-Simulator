@@ -71,7 +71,6 @@ pub struct Editor {
     parametric_error: Option<String>,
     merge_enabled: bool,
     merge_mass_threshold: f32,
-    show_grid: bool,
 }
 
 impl Editor {
@@ -84,7 +83,6 @@ impl Editor {
             parametric_error: None,
             merge_enabled: false,
             merge_mass_threshold: 1e10,
-            show_grid: false,
         }
     }
 
@@ -167,13 +165,7 @@ impl Editor {
                 ui.end_row();
 
                 ui.label("Show Grid");
-                ui.checkbox(&mut self.show_grid, "");
-                if self.show_grid {
-                    state.events.push(Event::ShowGrid(true));
-                } else {
-                    state.events.push(Event::ShowGrid(false));
-                }
-
+                ui.checkbox(&mut state.show_grid, "");
                 ui.end_row();
             });
 

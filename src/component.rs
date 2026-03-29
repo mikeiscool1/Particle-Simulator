@@ -16,7 +16,6 @@ pub use editor::Editor;
 pub enum Event {
     Alert(String),
     ResetSimulation,
-    ShowGrid(bool)
 }
 
 pub trait Component {
