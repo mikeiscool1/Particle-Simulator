@@ -620,6 +620,7 @@ impl Editor {
         ui.label("Use Domain: enables/disables domain looping.");
         ui.label("Domain [min, max]: the range of the parameter t over which the equation is evaluated.");
         ui.label("Direction: Wrap jumps from max back to min. Ping Pong goes back and forth between min and max.");
+        ui.label("Equation variables: t (time), i (particle index), x, y, z (current particle position)");
         ui.add_space(10.0);
     }
 
