@@ -575,6 +575,12 @@ impl Editor {
                 Ok(()) => state.events.push(Event::Alert("Parametric equations updated".to_string())),
                 Err(()) => {}
             }
+
+            if !state.clock_running {
+                for parametric in &particles.parametric_equations {
+                    parametric.apply_to_particles(&mut particles.particles, particles.time);
+                }
+            }
         }
 
         if let Some(error) = &self.parametric_error {
