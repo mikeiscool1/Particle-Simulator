@@ -251,6 +251,11 @@ impl Component for Particles {
                 for i in used..self.particles.len() {
                     self.particles[i].hidden = true;
                 }
+
+                for parametric in &self.parametric_equations {
+                    parametric.apply_to_particles(&mut self.particles, self.time);
+                }
+
             }
             alert_msg = format!("Parametric Mode: {}", if self.use_parametric { "On" } else { "Off" });
         }
