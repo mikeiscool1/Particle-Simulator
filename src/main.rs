@@ -105,6 +105,11 @@ async fn main() {
                     particles.time = 0.0;
                     if !particles.use_parametric {
                         set_particles(&mut particles.particles);
+                    } else {
+                        for parametric in &particles.parametric_equations {
+                            parametric.apply_to_particles(&mut particles.particles, particles.time);
+                        }
+
                     }
                     alert.alert("Simulation Reset");
                 }
