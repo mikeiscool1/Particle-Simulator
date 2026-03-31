@@ -1,6 +1,8 @@
 # Particle Simulator
 ## A simple particle simulator
 
+![particle-sim-photo](web/preview-image.png)
+
 Includes:
 - Gravity
 - Velocity & Acceleration
