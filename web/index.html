@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Particle Simulator</title>
     <style>
         html, body {
@@ -16,14 +16,87 @@
             width: 100%;
             height: 100%;
         }
+
+        button {
+            background-color: white;
+            border: none;
+            padding: 10px;
+            font-size: 18px;
+            border-radius: 5px;
+            opacity: 0.8;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            transition: background-color 0.1s, transform 0.05s;
+            touch-action: manipulation;
+        }
+
+        .pressed {
+            background-color: #ddd;
+            transform: scale(0.95);
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        /* Only show on devices that have a touch screen */
+        @media (pointer: coarse) {
+            #controls {
+                display: flex;
+            }
+        }
     </style>
 </head>
 <body>
     <canvas id="glcanvas" tabindex="1"></canvas>
+
+    <div id="controls">
+        <button id="btn-up">▲</button>
+        <div class="side-by-side">
+            <button id="btn-left">◀</button>
+            <button id="btn-down">▼</button>
+            <button id="btn-right">▶</button>
+        </div>
+    </div>
+
     <script src="https://not-fl3.github.io/miniquad-samples/mq_js_bundle.js"></script>
     <script>
         load("../target/wasm32-unknown-unknown/release/particle_sim.wasm");
         canvas.addEventListener("contextmenu", e => e.preventDefault())
+
+        const mapKey = (elementId, key) => {
+            const el = document.getElementById(elementId);
+
+            el.addEventListener("touchstart", (e) => { el.classList.add("pressed"); wasm_exports.key_down(key, 0, true); });
+            el.addEventListener("touchend", (e) => { el.classList.remove("pressed"); wasm_exports.key_up(key, 0, true); });
+        };
+
+        mapKey("btn-up", 87);
+        mapKey("btn-down", 83);
+        mapKey("btn-left", 65);
+        mapKey("btn-right", 68);
+
+        canvas.ontouchmove = e => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.touches[0].clientX - rect.left;
+            const y = e.touches[0].clientY - rect.top;
+            
+            wasm_exports.mouse_down(x, y, 1);
+        }
+
+        canvas.ontouchend = e => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.changedTouches[0].clientX - rect.left;
+            const y = e.changedTouches[0].clientY - rect.top;
+            
+            wasm_exports.mouse_up(x, y, 1);
+        }
     </script>
 </body>
 </html>
