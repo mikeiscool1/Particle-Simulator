@@ -82,7 +82,7 @@
         mapKey("btn-left", 65);
         mapKey("btn-right", 68);
 
-        canvas.ontouchmove = e => {
+        canvas.ontouchstart = e => {
             const rect = canvas.getBoundingClientRect();
             const x = e.touches[0].clientX - rect.left;
             const y = e.touches[0].clientY - rect.top;
