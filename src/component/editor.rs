@@ -1,15 +1,17 @@
-use std::path::PathBuf;
-
 use egui_macroquad::egui;
 use macroquad::prelude::*;
 use serde::{Serialize, Deserialize};
-use directories::ProjectDirs;
+
+#[cfg(not(target_arch = "wasm32"))]
 use serde_json::json;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::PathBuf;
 
 use crate::component::{Component, Event, particles::{DomainLoopDirection, ParametricEquations, Particle, Particles, compile_parametric_fn, insert_implicit_mul}};
 use crate::State;
 
 #[derive(Serialize, Deserialize)]
+#[cfg(not(target_arch = "wasm32"))]
 struct Save {
     state: State,
     particles: Particles,
@@ -107,8 +109,10 @@ pub struct Editor {
     #[serde(skip_serializing, skip_deserializing, default)]
     expanded_parametric: Vec<bool>,
     #[serde(skip_serializing, skip_deserializing, default)]
+    #[cfg(not(target_arch = "wasm32"))]
     config_dir: Option<PathBuf>,
     #[serde(skip_serializing, skip_deserializing, default)]
+    #[cfg(not(target_arch = "wasm32"))]
     saves_list: Vec<String>,
     #[serde(skip_serializing, skip_deserializing, default)]
     parametric_error: Option<String>,
@@ -116,32 +120,40 @@ pub struct Editor {
 
 impl Editor {
     pub fn new(visible: bool) -> Self {
-        let config_dir = ProjectDirs::from("", "", "ParticleSimulator").map(|dirs| dirs.config_dir().to_path_buf());
+        #[cfg(not(target_arch = "wasm32"))]
+        let config_dir: Option<PathBuf>;
+        #[cfg(not(target_arch = "wasm32"))]
+        let saves_list: Vec<String>;
 
-        if let Some(dir) = &config_dir {
-            std::fs::create_dir_all(dir).unwrap_or_else(|err| {
-                eprintln!("Failed to create config directory {:?}: {}", dir, err);
-            });
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            config_dir = directories::ProjectDirs::from("", "", "ParticleSimulator").map(|dirs| dirs.config_dir().to_path_buf());
+
+            if let Some(dir) = &config_dir {
+                std::fs::create_dir_all(dir).unwrap_or_else(|err| {
+                    eprintln!("Failed to create config directory {:?}: {}", dir, err);
+                });
+            }
+
+            saves_list = if let Some(config_dir) = &config_dir {
+                std::fs::read_dir(config_dir)
+                    .map(|entries| {
+                        entries.filter_map(|entry| {
+                            entry.ok().and_then(|e| {
+                                let path = e.path();
+                                if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+                                    path.file_stem().and_then(|stem| stem.to_str()).map(|s| s.to_string())
+                                } else {
+                                    None
+                                }
+                            })
+                        }).collect()
+                    })
+                    .unwrap_or_else(|_| Vec::new())
+            } else {
+                Vec::new()
+            };
         }
-
-        let saves_list = if let Some(config_dir) = &config_dir {
-            std::fs::read_dir(config_dir)
-                .map(|entries| {
-                    entries.filter_map(|entry| {
-                        entry.ok().and_then(|e| {
-                            let path = e.path();
-                            if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("json") {
-                                path.file_stem().and_then(|stem| stem.to_str()).map(|s| s.to_string())
-                            } else {
-                                None
-                            }
-                        })
-                    }).collect()
-                })
-                .unwrap_or_else(|_| Vec::new())
-        } else {
-            Vec::new()
-        };
 
         Self {
             visible,
@@ -151,11 +163,15 @@ impl Editor {
             parametric_error: None,
             merge_enabled: false,
             merge_mass_threshold: 1e10,
+
+            #[cfg(not(target_arch = "wasm32"))]
             config_dir,
+            #[cfg(not(target_arch = "wasm32"))]
             saves_list
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn apply_editor_save(&mut self, loaded_editor: Editor) {
         self.parametric_equations = loaded_editor.parametric_equations;
         self.merge_enabled = loaded_editor.merge_enabled;
@@ -211,17 +227,16 @@ impl Editor {
 
                     ui.separator();
 
-                    if cfg!(target_arch = "wasm32") {
-                        ui.label("Saves are not supported on WebAssembly");
-                    } else {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
                         egui::CollapsingHeader::new("Saves")
                             .default_open(false)
                             .show(ui, |ui| {
                                 self.draw_saves(ui, particles, state);
                         });
-                    }
 
-                    ui.separator();
+                        ui.separator();
+                    }
 
                     egui::CollapsingHeader::new("Help")
                         .default_open(false)
@@ -664,6 +679,7 @@ impl Editor {
         }
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn draw_saves(&mut self, ui: &mut egui::Ui, particles: &mut Particles, state: &mut State) {
         ui.horizontal(|ui| {
             if ui.button("Save Current").clicked() {
@@ -791,7 +807,7 @@ impl Editor {
         ui.label("Toggle sphere/cube rendering: c");
         ui.label("Tip: use cube rendering for many particles to reduce lag");
         ui.separator();
-        ui.label("Toggle simulation/parametric mode: /");
+        ui.label("Toggle simulation/parametric mode: m");
         ui.separator();
         ui.label("Hide editor: p");
         ui.separator();

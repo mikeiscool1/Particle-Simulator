@@ -245,7 +245,7 @@ impl Component for Particles {
             self.use_cubes = !self.use_cubes;
             alert_msg = format!("Render Mode: {}", if self.use_cubes { "Cubes" } else { "Spheres" });
         }
-        if is_key_pressed(KeyCode::Slash) {
+        if is_key_pressed(KeyCode::M) {
             self.use_parametric = !self.use_parametric;
             // Always unhide everything first
             for p in &mut self.particles {
