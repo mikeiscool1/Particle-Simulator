@@ -1,24 +1,44 @@
+use std::path::PathBuf;
+
 use egui_macroquad::egui;
 use macroquad::prelude::*;
+use serde::{Serialize, Deserialize};
+use directories::ProjectDirs;
+use serde_json::json;
 
 use crate::component::{Component, Event, particles::{DomainLoopDirection, ParametricEquations, Particle, Particles, compile_parametric_fn, insert_implicit_mul}};
 use crate::State;
 
+#[derive(Serialize, Deserialize)]
+struct Save {
+    state: State,
+    particles: Particles,
+    editor: Editor,
+}
+
+#[derive(Serialize, Deserialize)]
 struct ParametricEquationEditor {
     x_expr: String,
     y_expr: String,
     z_expr: String,
     spread_expr: String,
+    #[serde(skip_serializing, skip_deserializing, default)]
     x_expr_error: bool,
+    #[serde(skip_serializing, skip_deserializing, default)]
     y_expr_error: bool,
+    #[serde(skip_serializing, skip_deserializing, default)]
     z_expr_error: bool,
+    #[serde(skip_serializing, skip_deserializing, default)]
     spread_expr_error: bool,
     use_domain: bool,
     domain_lower_expr: String,
     domain_upper_expr: String,
+    #[serde(skip_serializing, skip_deserializing, default)]
     domain_lower_expr_error: bool,
+    #[serde(skip_serializing, skip_deserializing, default)]
     domain_upper_expr_error: bool,
     domain_direction: DomainLoopDirection,
+    #[serde(skip_serializing, skip_deserializing, default)]
     error: Option<String>,
     num_particles: usize,
     running: bool,
@@ -75,18 +95,54 @@ impl ParametricEquationEditor {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Editor {
     pub visible: bool,
-    expanded_particles: Vec<bool>,
-    expanded_parametric: Vec<bool>,
-    parametric_equations: Vec<ParametricEquationEditor>,
-    parametric_error: Option<String>,
     merge_enabled: bool,
     merge_mass_threshold: f32,
+    parametric_equations: Vec<ParametricEquationEditor>,
+    
+    #[serde(skip_serializing, skip_deserializing, default)]
+    expanded_particles: Vec<bool>,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    expanded_parametric: Vec<bool>,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    config_dir: Option<PathBuf>,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    saves_list: Vec<String>,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    parametric_error: Option<String>,
 }
 
 impl Editor {
     pub fn new(visible: bool) -> Self {
+        let config_dir = ProjectDirs::from("", "", "ParticleSimulator").map(|dirs| dirs.config_dir().to_path_buf());
+
+        if let Some(dir) = &config_dir {
+            std::fs::create_dir_all(dir).unwrap_or_else(|err| {
+                eprintln!("Failed to create config directory {:?}: {}", dir, err);
+            });
+        }
+
+        let saves_list = if let Some(config_dir) = &config_dir {
+            std::fs::read_dir(config_dir)
+                .map(|entries| {
+                    entries.filter_map(|entry| {
+                        entry.ok().and_then(|e| {
+                            let path = e.path();
+                            if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("json") {
+                                path.file_stem().and_then(|stem| stem.to_str()).map(|s| s.to_string())
+                            } else {
+                                None
+                            }
+                        })
+                    }).collect()
+                })
+                .unwrap_or_else(|_| Vec::new())
+        } else {
+            Vec::new()
+        };
+
         Self {
             visible,
             expanded_particles: Vec::new(),
@@ -95,7 +151,15 @@ impl Editor {
             parametric_error: None,
             merge_enabled: false,
             merge_mass_threshold: 1e10,
+            config_dir,
+            saves_list
         }
+    }
+
+    pub fn apply_editor_save(&mut self, loaded_editor: Editor) {
+        self.parametric_equations = loaded_editor.parametric_equations;
+        self.merge_enabled = loaded_editor.merge_enabled;
+        self.merge_mass_threshold = loaded_editor.merge_mass_threshold;
     }
 
     pub fn draw_egui(&mut self, ctx: &egui::Context, particles: &mut Particles, state: &mut State) {
@@ -144,6 +208,18 @@ impl Editor {
                         .show(ui, |ui| {
                             self.draw_particles(ui, particles);
                         });
+
+                    ui.separator();
+
+                    if cfg!(target_arch = "wasm32") {
+                        ui.label("Saves are not supported on WebAssembly");
+                    } else {
+                        egui::CollapsingHeader::new("Saves")
+                            .default_open(false)
+                            .show(ui, |ui| {
+                                self.draw_saves(ui, particles, state);
+                        });
+                    }
 
                     ui.separator();
 
@@ -278,7 +354,7 @@ impl Editor {
                     particles.min_merge_mass = if self.merge_enabled {
                         self.merge_mass_threshold
                     } else {
-                        f32::INFINITY
+                        -1.0
                     };
                 }
                 ui.end_row();
@@ -570,7 +646,7 @@ impl Editor {
             changed = true;
         }
 
-        if changed {
+        if changed && particles.use_parametric {
             match self.try_compile_parametric(particles) {
                 Ok(()) => state.events.push(Event::Alert("Parametric equations updated".to_string())),
                 Err(()) => {}
@@ -585,6 +661,115 @@ impl Editor {
 
         if let Some(error) = &self.parametric_error {
             ui.colored_label(egui::Color32::RED, error);
+        }
+    }
+
+    fn draw_saves(&mut self, ui: &mut egui::Ui, particles: &mut Particles, state: &mut State) {
+        ui.horizontal(|ui| {
+            if ui.button("Save Current").clicked() {
+                if let Some(config_dir) = &self.config_dir {
+                    let mut save_name = format!("save_{}.json", chrono::Local::now().format("%Y-%m-%d-%H-%M-%S"));
+                    let mut path = config_dir.join(&save_name);
+                    let mut count = 1;
+                    while path.exists() {
+                        save_name = format!("save_{}-{}.json", chrono::Local::now().format("%Y-%m-%d-%H-%M-%S"), count);
+                        path = config_dir.join(&save_name);
+                        count += 1;
+                    }
+
+                    let object = json!({
+                        "state": &state,
+                        "particles": &particles,
+                        "editor": &self,
+                    });
+
+                    match serde_json::to_string_pretty(&object) {
+                        Ok(json) => {
+                            if let Err(err) = std::fs::write(&path, json) {
+                                state.events.push(Event::Alert(format!("Failed to write save file: {}", err)));
+                                eprintln!("Failed to write save file {:?}: {}", path, err);
+                            } else {
+                                self.saves_list.push(save_name.trim_end_matches(".json").to_string());
+                                state.events.push(Event::Alert("Save successful".to_string()));
+                            }
+                        }
+                        Err(err) => {
+                            state.events.push(Event::Alert(format!("Failed to serialize save data: {}", err)));
+                            eprintln!("Failed to serialize save data: {}", err);
+                        }
+                    }
+                }
+            }
+        });
+
+        ui.separator();
+
+        let mut selected_save: Option<Save> = None;
+        let mut delete_save: Option<String> = None;
+
+        if self.saves_list.is_empty() {
+            ui.label("No saves found");
+        } else {
+            for save in &self.saves_list {
+                ui.horizontal(|ui| {
+                    ui.label(save);
+                    if ui.button("Load").clicked() {
+                        if let Some(config_dir) = &self.config_dir {
+                            let path = config_dir.join(format!("{}.json", save));
+                            match std::fs::read_to_string(&path) {
+                                Ok(contents) => match serde_json::from_str::<Save>(&contents) {
+                                    Ok(loaded_save) => {
+                                        selected_save = Some(loaded_save);
+                                        state.events.push(Event::Alert(format!("Loaded save: {}", save)));
+                                    }
+                                    Err(err) => {
+                                        state.events.push(Event::Alert(format!("Failed to parse save file: {}", err)));
+                                        eprintln!("Failed to parse save file {:?}: {}", path, err);
+                                    }
+                                },
+                                Err(err) => {
+                                    state.events.push(Event::Alert(format!("Failed to read save file: {}", err)));
+                                    eprintln!("Failed to read save file {:?}: {}", path, err);
+                                }
+                            }
+                        }
+                    }
+
+                    if ui.button("📄").clicked() {
+                        if let Some(config_dir) = &self.config_dir {
+                            let path = config_dir.join(format!("{}.json", save));
+                            if let Err(err) = open::that(&path) {
+                                state.events.push(Event::Alert(format!("Failed to open save file: {}", err)));
+                                eprintln!("Failed to open save file {:?}: {}", path, err);
+                            }
+                        }
+                    }
+
+                    if ui.button("X").clicked() {
+                        if let Some(config_dir) = &self.config_dir {
+                            let path = config_dir.join(format!("{}.json", save));
+                            if let Err(err) = std::fs::remove_file(&path) {
+                                state.events.push(Event::Alert(format!("Failed to delete save file: {}", err)));
+                                eprintln!("Failed to delete save file {:?}: {}", path, err);
+                            } else {
+                                state.events.push(Event::Alert(format!("Deleted save: {}", save)));
+                                delete_save = Some(save.clone());
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        if let Some(loaded_save) = selected_save {
+            state.apply_state_save(loaded_save.state);
+            *particles = loaded_save.particles;
+            self.apply_editor_save(loaded_save.editor);
+            self.try_compile_parametric(particles).ok();
+        }
+
+        if let Some(save_to_delete) = delete_save {
+            self.saves_list.retain(|s| s != &save_to_delete);
         }
     }
 

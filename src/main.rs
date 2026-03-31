@@ -1,33 +1,58 @@
 use core::f32;
-
 use macroquad::prelude::*;
+use serde::{Deserialize, Serialize};
 
 mod component;
 mod input;
 mod force;
 mod setup;
+mod serde_helper;
 
 use component::{Component, Grid, Particles, Alert, Editor};
-
 use input::handle_input;
 use setup::set_particles;
+use serde_helper::serde_color;
 
+#[derive(Serialize, Deserialize)]
 struct State {
-    yaw: f32, // Start camera yaw (rotation around the Y axis)
-    pitch: f32, // Start camera pitch (rotation around the X axis)
-    pos: Vec3, // Start camera position
-    camera: Camera3D,
-    last_mouse: Option<(f32, f32)>,
-    is_fullscreen: bool, // Whether the window is currently in fullscreen mode
-    speed: f32, // Camera speed
+    yaw: f32,
+    pitch: f32,
+    pos: Vec3,
     time_warp: f32,
-    clock_running: bool, // Whether the simulation clock is running
-    editor_panel_width: f32,
-    ui_captures_keyboard: bool,
-    ui_captures_pointer: bool,
+    #[serde(with = "serde_color")]
     bg_color: Color,
     show_grid: bool,
+
+    #[serde(skip_serializing, skip_deserializing, default)]
+    camera: Camera3D,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    last_mouse: Option<(f32, f32)>,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    is_fullscreen: bool,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    speed: f32, // Camera speed
+    #[serde(skip_serializing, skip_deserializing, default)]
+    clock_running: bool, // Whether the simulation clock is running
+    #[serde(skip_serializing, skip_deserializing, default)]
+    editor_panel_width: f32,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    ui_captures_keyboard: bool,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    ui_captures_pointer: bool,
+    #[serde(skip_serializing, skip_deserializing, default)]
     events: Vec<component::Event>, // Events that components can trigger to communicate with each other
+}
+
+impl State {
+    fn apply_state_save(&mut self, loaded_state: State) {
+        self.yaw = loaded_state.yaw;
+        self.pitch = loaded_state.pitch;
+        self.pos = loaded_state.pos;
+        self.bg_color = loaded_state.bg_color;
+        self.show_grid = loaded_state.show_grid;
+        self.time_warp = loaded_state.time_warp;
+        self.clock_running = false;
+    }
 }
 
 fn window_conf() -> Conf {
@@ -61,7 +86,7 @@ async fn main() {
         particles: Vec::new(), 
         show_trail: true, 
         use_cubes: true,
-        min_merge_mass: f32::INFINITY,
+        min_merge_mass: -1.0,
         g: 6.67430e-11,
         use_parametric: false,
         time: 0.0,
@@ -77,7 +102,7 @@ async fn main() {
     let _ = editor.try_compile_parametric(&mut particles);
 
     loop {
-        let dt = get_frame_time();
+        let dt = get_frame_time().min(0.1);
 
         state.ui_captures_keyboard = false;
         state.ui_captures_pointer = false;

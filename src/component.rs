@@ -12,7 +12,6 @@ pub use alert::Alert;
 pub use fps::FPS;
 pub use editor::Editor;
 
-
 pub enum Event {
     Alert(String),
     ResetSimulation,

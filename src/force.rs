@@ -48,7 +48,7 @@ pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g:
                 let escape_velocity = (2.0 * g * total_mass / distance.max(1e-6)).sqrt();
                 let approach_speed = (-relative_speed_normal).max(0.0);
 
-                let should_merge = particles[i].mass >= min_merge_mass && particles[j].mass >= min_merge_mass && approach_speed < escape_velocity;
+                let should_merge = min_merge_mass != -1.0 && particles[i].mass >= min_merge_mass && particles[j].mass >= min_merge_mass && approach_speed < escape_velocity;
 
                 if should_merge {
                     merge_particles(particles, i, j);

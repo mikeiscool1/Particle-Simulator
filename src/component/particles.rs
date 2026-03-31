@@ -1,14 +1,16 @@
 use std::collections::VecDeque;
+use serde::{Serialize, Deserialize};
 
 use meval::Expr;
 use macroquad::prelude::*;
 use crate::force::{resolve_collisions, n_body_update};
 use crate::component::{Component, Event};
 use crate::State;
+use crate::serde_helper::serde_color;
 
 type ParametricFn = Box<dyn Fn(f64, f64, f64, f64, f64) -> f64>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DomainLoopDirection {
     Wrap,
     PingPong,
@@ -107,7 +109,7 @@ pub fn compile_parametric_fn(src: &str) -> Result<ParametricFn, String> {
     Ok(Box::new(move |t: f64, i: f64, x: f64, y: f64, z: f64| func(t, i, x, y, z)))
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Particle {
     pub pos: Vec3,
     pub vel: Vec3,
@@ -116,7 +118,9 @@ pub struct Particle {
     pub friction: f32,
     pub restitution: f32,
     pub radius: f32,
+    #[serde(with = "serde_color")]
     pub color: Color,
+    #[serde(skip_serializing, skip_deserializing, default)]
     pub trail: VecDeque<Vec3>,
     pub hidden: bool,
 }
@@ -156,6 +160,7 @@ impl Default for Particle {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Particles {
     pub show_trail: bool,
     pub use_cubes: bool,
@@ -163,6 +168,7 @@ pub struct Particles {
     pub g: f32,
     pub use_parametric: bool,
     pub time: f32,
+    #[serde(skip_serializing, skip_deserializing, default)]
     pub parametric_equations: Vec<ParametricEquations>,
     pub particles: Vec<Particle>,
 }
