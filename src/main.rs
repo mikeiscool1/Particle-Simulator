@@ -43,7 +43,6 @@ struct State {
     events: Vec<component::Event>, // Events that components can trigger to communicate with each other
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl State {
     fn apply_state_save(&mut self, loaded_state: State) {
         self.yaw = loaded_state.yaw;

@@ -2,16 +2,17 @@ use egui_macroquad::egui;
 use macroquad::prelude::*;
 use serde::{Serialize, Deserialize};
 
-#[cfg(not(target_arch = "wasm32"))]
 use serde_json::json;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
+
+#[cfg(target_arch = "wasm32")]
+use quad_storage::STORAGE;
 
 use crate::component::{Component, Event, particles::{DomainLoopDirection, ParametricEquations, Particle, Particles, compile_parametric_fn, insert_implicit_mul}};
 use crate::State;
 
 #[derive(Serialize, Deserialize)]
-#[cfg(not(target_arch = "wasm32"))]
 struct Save {
     state: State,
     particles: Particles,
@@ -112,7 +113,6 @@ pub struct Editor {
     #[cfg(not(target_arch = "wasm32"))]
     config_dir: Option<PathBuf>,
     #[serde(skip_serializing, skip_deserializing, default)]
-    #[cfg(not(target_arch = "wasm32"))]
     saves_list: Vec<String>,
     #[serde(skip_serializing, skip_deserializing, default)]
     parametric_error: Option<String>,
@@ -122,7 +122,7 @@ impl Editor {
     pub fn new(visible: bool) -> Self {
         #[cfg(not(target_arch = "wasm32"))]
         let config_dir: Option<PathBuf>;
-        #[cfg(not(target_arch = "wasm32"))]
+
         let saves_list: Vec<String>;
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -154,6 +154,13 @@ impl Editor {
                 Vec::new()
             };
         }
+        #[cfg(target_arch = "wasm32")]
+        {
+            let mut storage = STORAGE.lock().unwrap();
+            saves_list = serde_json::from_str(&storage.get("saves_list")
+                .unwrap_or_else(|| { storage.set("saves_list", "[]"); "[]".to_string() }))
+                .unwrap_or_else(|_| Vec::new());
+        }
 
         Self {
             visible,
@@ -166,12 +173,11 @@ impl Editor {
 
             #[cfg(not(target_arch = "wasm32"))]
             config_dir,
-            #[cfg(not(target_arch = "wasm32"))]
+
             saves_list
         }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn apply_editor_save(&mut self, loaded_editor: Editor) {
         self.parametric_equations = loaded_editor.parametric_equations;
         self.merge_enabled = loaded_editor.merge_enabled;
@@ -227,16 +233,13 @@ impl Editor {
 
                     ui.separator();
 
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        egui::CollapsingHeader::new("Saves")
-                            .default_open(false)
-                            .show(ui, |ui| {
-                                self.draw_saves(ui, particles, state);
-                        });
+                    egui::CollapsingHeader::new("Saves")
+                        .default_open(false)
+                        .show(ui, |ui| {
+                            self.draw_saves(ui, particles, state);
+                    });
 
-                        ui.separator();
-                    }
+                    ui.separator();
 
                     egui::CollapsingHeader::new("Help")
                         .default_open(false)
@@ -679,10 +682,10 @@ impl Editor {
         }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn draw_saves(&mut self, ui: &mut egui::Ui, particles: &mut Particles, state: &mut State) {
         ui.horizontal(|ui| {
             if ui.button("Save Current").clicked() {
+                #[cfg(not(target_arch = "wasm32"))]
                 if let Some(config_dir) = &self.config_dir {
                     let mut save_name = format!("save_{}.json", chrono::Local::now().format("%Y-%m-%d-%H-%M-%S"));
                     let mut path = config_dir.join(&save_name);
@@ -715,6 +718,42 @@ impl Editor {
                         }
                     }
                 }
+                #[cfg(target_arch="wasm32")]
+                {
+                    let mut save_name = format!("save_{}.json", quad_timestamp::timestamp_utc().unwrap());
+                    let mut count = 1;
+
+                    while !self.saves_list.iter().all(|s| *s != save_name) {
+                        save_name = format!("save_{}-{}.json", quad_timestamp::timestamp_utc().unwrap(), count);
+                        count += 1;
+                    }
+
+                    let object = json!({
+                        "state": &state,
+                        "particles": &particles,
+                        "editor": &self,
+                    });
+
+                    match serde_json::to_string(&object) {
+                        Ok(json) => {
+                            let mut storage = STORAGE.lock().unwrap();
+                            storage.set(&save_name, &json);
+
+                            // check if it was successfully saved
+                            if storage.get(&save_name).is_none() {
+                                state.events.push(Event::Alert(format!("Failed to save: {}", save_name)));
+                            } else {
+                                self.saves_list.push(save_name);
+                                storage.set("saves_list", &serde_json::to_string(&self.saves_list).unwrap_or_else(|_| "[]".to_string()));
+                                state.events.push(Event::Alert("Save successful".to_string()));
+                            }
+                        }
+                        Err(err) => {
+                            state.events.push(Event::Alert(format!("Failed to serialize save data: {}", err)));
+                            eprintln!("Failed to serialize save data: {}", err);
+                        }
+                    }
+                }
             }
         });
 
@@ -730,6 +769,7 @@ impl Editor {
                 ui.horizontal(|ui| {
                     ui.label(save);
                     if ui.button("Load").clicked() {
+                        #[cfg(not(target_arch = "wasm32"))]
                         if let Some(config_dir) = &self.config_dir {
                             let path = config_dir.join(format!("{}.json", save));
                             match std::fs::read_to_string(&path) {
@@ -749,8 +789,28 @@ impl Editor {
                                 }
                             }
                         }
+                        #[cfg(target_arch = "wasm32")]
+                        {
+                            match STORAGE.lock().unwrap().get(save) {
+                                Some(contents) => match serde_json::from_str::<Save>(&contents) {
+                                    Ok(loaded_save) => {
+                                        selected_save = Some(loaded_save);
+                                        state.events.push(Event::Alert(format!("Loaded save: {}", save)));
+                                    }
+                                    Err(err) => {
+                                        state.events.push(Event::Alert(format!("Failed to parse save data: {}", err)));
+                                        eprintln!("Failed to parse save data for {}: {}", save, err);
+                                    }
+                                },
+                                None => {
+                                    state.events.push(Event::Alert("Save data not found".to_string()));
+                                    eprintln!("Save data not found for {}", save);
+                                }
+                            }
+                        }
                     }
 
+                    #[cfg(not(target_arch = "wasm32"))]
                     if ui.button("📄").clicked() {
                         if let Some(config_dir) = &self.config_dir {
                             let path = config_dir.join(format!("{}.json", save));
@@ -762,6 +822,7 @@ impl Editor {
                     }
 
                     if ui.button("X").clicked() {
+                        #[cfg(not(target_arch = "wasm32"))]
                         if let Some(config_dir) = &self.config_dir {
                             let path = config_dir.join(format!("{}.json", save));
                             if let Err(err) = std::fs::remove_file(&path) {
@@ -771,6 +832,13 @@ impl Editor {
                                 state.events.push(Event::Alert(format!("Deleted save: {}", save)));
                                 delete_save = Some(save.clone());
                             }
+                        }
+                        #[cfg(target_arch = "wasm32")]
+                        {
+                            let mut storage = STORAGE.lock().unwrap();
+                            storage.remove(save);
+                            state.events.push(Event::Alert(format!("Deleted save: {}", save)));
+                            delete_save = Some(save.clone());
                         }
                     }
                 });
@@ -786,6 +854,9 @@ impl Editor {
 
         if let Some(save_to_delete) = delete_save {
             self.saves_list.retain(|s| s != &save_to_delete);
+
+            #[cfg(target_arch = "wasm32")]
+            STORAGE.lock().unwrap().set("saves_list", &serde_json::to_string(&self.saves_list).unwrap_or_else(|_| "[]".to_string()));
         }
     }
 

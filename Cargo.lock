@@ -566,13 +566,19 @@ checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "js-sys"
-version = "0.3.92"
+version = "0.3.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc4c90f45aa2e6eacbe8645f77fdea542ac97a494bcd117a67df9ff4d611f995"
+checksum = "797146bb2677299a1eb6b7b50a890f4c361b29ef967addf5b2fa45dae1bb6d7d"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lewton"
@@ -713,6 +719,21 @@ dependencies = [
  "adler2",
  "simd-adler32",
 ]
+
+[[package]]
+name = "nanoserde"
+version = "0.1.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5de9cf844ab1e25a0353525bd74cb889843a6215fa4a0d156fd446f4857a1b99"
+dependencies = [
+ "nanoserde-derive",
+]
+
+[[package]]
+name = "nanoserde-derive"
+version = "0.1.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e943b2c21337b7e3ec6678500687cdc741b7639ad457f234693352075c082204"
 
 [[package]]
 name = "ndk-sys"
@@ -923,6 +944,8 @@ dependencies = [
  "macroquad",
  "meval",
  "open",
+ "quad-storage",
+ "quad-timestamp",
  "serde",
  "serde_json",
 ]
@@ -1013,6 +1036,35 @@ dependencies = [
  "libc",
  "quad-alsa-sys",
  "winapi",
+]
+
+[[package]]
+name = "quad-storage"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e73edba8c792f3b5a45c68a1086f6f8c1bbda34ab9399a7faabd7dc7d4e14a0e"
+dependencies = [
+ "lazy_static",
+ "nanoserde",
+ "quad-storage-sys",
+]
+
+[[package]]
+name = "quad-storage-sys"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1187c77ced2cc6ae79bd6e35cc09e22159164a05c4d867e299bfbf1f801e9157"
+dependencies = [
+ "sapp-jsutils",
+]
+
+[[package]]
+name = "quad-timestamp"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8739015e3f8f1478398bddeba9d2fda2124291b04790d76b963663cdcc3ed1be"
+dependencies = [
+ "chrono",
 ]
 
 [[package]]
@@ -1294,9 +1346,9 @@ checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.115"
+version = "0.2.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6523d69017b7633e396a89c5efab138161ed5aafcbc8d3e5c5a42ae38f50495a"
+checksum = "7dc0882f7b5bb01ae8c5215a1230832694481c1a4be062fd410e12ea3da5b631"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -1307,9 +1359,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.115"
+version = "0.2.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e3a6c758eb2f701ed3d052ff5737f5bfe6614326ea7f3bbac7156192dc32e67"
+checksum = "75973d3066e01d035dbedaad2864c398df42f8dd7b1ea057c35b8407c015b537"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -1317,9 +1369,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.115"
+version = "0.2.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "921de2737904886b52bcbb237301552d05969a6f9c40d261eb0533c8b055fedf"
+checksum = "91af5e4be765819e0bcfee7322c14374dc821e35e72fa663a830bbc7dc199eac"
 dependencies = [
  "bumpalo",
  "proc-macro2",
@@ -1330,9 +1382,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.115"
+version = "0.2.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a93e946af942b58934c604527337bad9ae33ba1d5c6900bbb41c2c07c2364a93"
+checksum = "c9bf0406a78f02f336bf1e451799cca198e8acde4ffa278f0fb20487b150a633"
 dependencies = [
  "unicode-ident",
 ]
@@ -1461,9 +1513,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.92"
+version = "0.3.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "84cde8507f4d7cfcb1185b8cb5890c494ffea65edbe1ba82cfd63661c805ed94"
+checksum = "749466a37ee189057f54748b200186b59a03417a117267baf3fd89cecc9fb837"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
