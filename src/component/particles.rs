@@ -203,6 +203,7 @@ impl Component for Particles {
             if p.hidden {
                 continue;
             }
+
             if self.use_cubes {
                 draw_cube(p.pos, vec3(p.radius * 2.0, p.radius * 2.0, p.radius * 2.0), None, p.color);
             } else {
@@ -215,6 +216,7 @@ impl Component for Particles {
                 if p.hidden {
                     continue;
                 }
+                
                 for i in 1..p.trail.len() {
                     let a = p.trail[i - 1];
                     let b = p.trail[i];

@@ -1,6 +1,7 @@
 use macroquad::prelude::*;
 use crate::component::Particle;
 use std::collections::VecDeque;
+use rayon::prelude::*;
 
 pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g: f32) {
     let mut i = 0;
@@ -131,22 +132,36 @@ fn merge_particles(particles: &mut Vec<Particle>, i: usize, j: usize) {
 pub fn n_body_update(particles: &mut [Particle], g: f32) {
     let n = particles.len();
 
-    for i in 0..n {
-        if particles[i].mass <= 0.0 {
-            continue; // skip massless particles
-        }
+    // Snapshot positions/masses to avoid borrow conflicts across threads
+    let snapshot: Vec<(Vec3, f32, f32)> = particles
+        .iter()
+        .map(|p| (p.pos, p.mass, p.radius))
+        .collect();
 
-        let mut force = vec3(0.0, 0.0, 0.0);
-        for j in 0..n {
-            if i != j && particles[j].mass > 0.0 {
-                let dir = particles[j].pos - particles[i].pos;
-                let min_dist = particles[i].radius + particles[j].radius;
-
-                let dist_sqr = dir.length_squared().max(min_dist * min_dist); // prevent singularity
-                let f = g * particles[i].mass * particles[j].mass / dist_sqr;
-                force += dir.normalize() * f;
+    particles
+        .par_iter_mut()
+        .enumerate()
+        .for_each(|(i, particle)| {
+            if particle.mass <= 0.0 {
+                return;
             }
-        }
-        particles[i].acc = force / particles[i].mass;
-    }
+
+            let mut force = vec3(0.0, 0.0, 0.0);
+            for j in 0..n {
+                if i != j {
+                    let (pos_j, mass_j, radius_j) = snapshot[j];
+                    if mass_j <= 0.0 {
+                        continue;
+                    }
+
+                    let dir = pos_j - particle.pos;
+                    let min_dist = particle.radius + radius_j;
+                    let dist_sqr = dir.length_squared().max(min_dist * min_dist);
+                    let f = g * particle.mass * mass_j / dist_sqr;
+                    force += dir.normalize() * f;
+                }
+            }
+
+            particle.acc = force / particle.mass;
+        });
 }
