@@ -64,6 +64,8 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    gl_set_drawcall_buffer_capacity(16000, 50000);
+
     let mut state = State {
         yaw: -135.0f32.to_radians(),
         pitch: -45.0f32.to_radians(),

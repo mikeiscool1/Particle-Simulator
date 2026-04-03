@@ -199,15 +199,51 @@ impl Particles {
 
 impl Component for Particles {
     fn draw(&self, _state: &State) {
-        for p in &self.particles {
-            if p.hidden {
-                continue;
-            }
-
-            if self.use_cubes {
+        if self.use_cubes {
+            for p in &self.particles {
+                if p.hidden {
+                    continue;
+                }
                 draw_cube(p.pos, vec3(p.radius * 2.0, p.radius * 2.0, p.radius * 2.0), None, p.color);
-            } else {
-                draw_sphere_ex(p.pos, p.radius, None, p.color, sphere_lod_params(p.radius));
+            }
+        } else {
+            let (base_sphere_vertices, base_sphere_indices) = match self.particles.len() {
+                0..=1000 => create_base_sphere(1.0, 16, 16),
+                1001..=5000 => create_base_sphere(1.0, 12, 12),
+                _ => create_base_sphere(1.0, 8, 8),
+            };
+
+            let verts_per_sphere = base_sphere_vertices.len() as u16;
+
+            const MAX_SPHERES_PER_BATCH: usize = 25;
+            for batch in self.particles.chunks(MAX_SPHERES_PER_BATCH) {
+                let mut vertices = Vec::with_capacity(batch.len() * base_sphere_vertices.len());
+                let mut indices = Vec::with_capacity(batch.len() * base_sphere_indices.len());
+
+                for (i, sphere) in batch.iter().enumerate() {
+                    if sphere.hidden {
+                        continue;
+                    }
+
+                    for v in &base_sphere_vertices {
+                        let mut new_v = *v;
+                        new_v.position = new_v.position * sphere.radius + sphere.pos;
+                        new_v.color = sphere.color.into();
+                        vertices.push(new_v);
+                    }
+
+                    for idx in &base_sphere_indices {
+                        indices.push(idx + i as u16 * verts_per_sphere);
+                    }
+                }
+
+                let mesh = Mesh {
+                    vertices,
+                    indices,
+                    texture: None,
+                };
+
+                draw_mesh(&mesh);
             }
         }
 
@@ -298,15 +334,52 @@ impl Component for Particles {
     }
 }
 
-fn sphere_lod_params(radius: f32) -> DrawSphereParams {
-    let clamped_radius = radius.max(0.1);
-    let slices = (12.0 + clamped_radius * 0.8).round() as usize;
-    let slices = slices.clamp(12, 96);
-    let rings = (slices / 2).clamp(8, 64);
+fn create_base_sphere(radius: f32, rings: u32, slices: u32) -> (Vec<Vertex>, Vec<u16>) {
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
 
-    DrawSphereParams {
-        rings,
-        slices,
-        ..Default::default()
+    // Generate vertices
+    for ring in 0..=rings {
+        let v = ring as f32 / rings as f32;
+        let theta = v * std::f32::consts::PI;
+
+        for slice in 0..=slices {
+            let u = slice as f32 / slices as f32;
+            let phi = u * std::f32::consts::TAU;
+
+            let x = phi.cos() * theta.sin();
+            let y = theta.cos();
+            let z = phi.sin() * theta.sin();
+
+            vertices.push(Vertex {
+                position: vec3(x * radius, y * radius, z * radius),
+                uv: vec2(u, v),
+                color: WHITE.into(),
+                normal: Vec4::ZERO
+            });
+        }
     }
+
+    // Generate indices
+    let verts_per_row = slices + 1;
+
+    for ring in 0..rings {
+        for slice in 0..slices {
+            let i0 = ring * verts_per_row + slice;
+            let i1 = i0 + 1;
+            let i2 = i0 + verts_per_row;
+            let i3 = i2 + 1;
+
+            // Two triangles per quad
+            indices.push(i0 as u16);
+            indices.push(i2 as u16);
+            indices.push(i1 as u16);
+
+            indices.push(i1 as u16);
+            indices.push(i2 as u16);
+            indices.push(i3 as u16);
+        }
+    }
+
+    (vertices, indices)
 }
