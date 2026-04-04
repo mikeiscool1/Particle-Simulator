@@ -1,7 +1,6 @@
 use macroquad::prelude::*;
 use crate::component::Particle;
 use std::collections::VecDeque;
-use rayon::prelude::*;
 
 pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g: f32) {
     let mut i = 0;
@@ -129,7 +128,10 @@ fn merge_particles(particles: &mut Vec<Particle>, i: usize, j: usize) {
     particles.swap_remove(j);
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn n_body_update(particles: &mut [Particle], g: f32) {
+    use rayon::prelude::*;
+    
     let n = particles.len();
 
     // Snapshot positions/masses to avoid borrow conflicts across threads
@@ -164,4 +166,41 @@ pub fn n_body_update(particles: &mut [Particle], g: f32) {
 
             particle.acc = force / particle.mass;
         });
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn n_body_update(particles: &mut [Particle], g: f32) {
+    let n = particles.len();
+
+    let snapshot: Vec<(Vec3, f32, f32)> = particles
+        .iter()
+        .map(|p| (p.pos, p.mass, p.radius))
+        .collect();
+
+    let mut forces = vec![Vec3::ZERO; n];
+
+    for i in 0..n {
+        let (pos_i, mass_i, radius_i) = snapshot[i];
+        if mass_i <= 0.0 { continue; }
+
+        for j in (i + 1)..n {
+            let (pos_j, mass_j, radius_j) = snapshot[j];
+            if mass_j <= 0.0 { continue; }
+
+            let dir = pos_j - pos_i;
+            let min_dist = radius_i + radius_j;
+            let dist_sqr = dir.length_squared().max(min_dist * min_dist);
+            let f = g * mass_i * mass_j / dist_sqr;
+            let force = dir.normalize() * f;
+
+            forces[i] += force;
+            forces[j] -= force;
+        }
+    }
+
+    particles.iter_mut().zip(forces.iter()).for_each(|(p, f)| {
+        if p.mass > 0.0 {
+            p.acc = *f / p.mass;
+        }
+    });
 }

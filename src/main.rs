@@ -57,14 +57,19 @@ impl State {
 
 fn window_conf() -> Conf {
     Conf {
-        window_title: "MyGame".to_owned(),
+        window_title: "Particle Simulator".to_owned(),
+        platform: miniquad::conf::Platform {
+            webgl_version: miniquad::conf::WebGLVersion::WebGL2,
+            ..Default::default()
+        },
         ..Default::default()
     }
 }
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    gl_set_drawcall_buffer_capacity(16000, 50000);
+    gl_set_drawcall_buffer_capacity(64000, 64000);
+
 
     let mut state = State {
         yaw: -135.0f32.to_radians(),
@@ -87,7 +92,7 @@ async fn main() {
     let mut particles = Particles { 
         particles: Vec::new(), 
         show_trail: true, 
-        use_cubes: true,
+        use_cubes: false,
         min_merge_mass: -1.0,
         g: 6.67430e-11,
         use_parametric: false,

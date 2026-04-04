@@ -876,7 +876,6 @@ impl Editor {
         ui.label("Show/Hide grid: g");
         ui.separator();
         ui.label("Toggle sphere/cube rendering: c");
-        ui.label("Tip: use cube rendering for many particles to reduce lag");
         ui.separator();
         ui.label("Toggle simulation/parametric mode: m");
         ui.separator();
