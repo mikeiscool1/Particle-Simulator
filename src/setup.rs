@@ -85,7 +85,7 @@ pub fn set_particles(particles: &mut Vec<Particle>, n: u32, demo: Demo) {
                     rand::gen_range(-25.0, 25.0),
                     rand::gen_range(-25.0, 25.0),
                 ),
-                mass: 1e8,
+                mass: 3e10,
                 color,
                 friction: 0.5,
                 ..Default::default()
