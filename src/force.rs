@@ -2,7 +2,12 @@ use crate::component::Particle;
 use macroquad::prelude::*;
 use std::collections::VecDeque;
 
-pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g: f32, use_cubes: bool) {
+pub fn resolve_collisions(
+    particles: &mut Vec<Particle>,
+    min_merge_mass: f32,
+    g: f32,
+    use_cubes: bool,
+) {
     let mut i = 0;
     while i < particles.len() {
         if particles[i].mass <= 0.0 {
@@ -38,13 +43,14 @@ pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g:
                 }
 
                 // Resolve along axis of least penetration
-                let (overlap, normal) = if penetration.x < penetration.y && penetration.x < penetration.z {
-                    (penetration.x, vec3(delta.x.signum(), 0.0, 0.0))
-                } else if penetration.y < penetration.z {
-                    (penetration.y, vec3(0.0, delta.y.signum(), 0.0))
-                } else {
-                    (penetration.z, vec3(0.0, 0.0, delta.z.signum()))
-                };
+                let (overlap, normal) =
+                    if penetration.x < penetration.y && penetration.x < penetration.z {
+                        (penetration.x, vec3(delta.x.signum(), 0.0, 0.0))
+                    } else if penetration.y < penetration.z {
+                        (penetration.y, vec3(0.0, delta.y.signum(), 0.0))
+                    } else {
+                        (penetration.z, vec3(0.0, 0.0, delta.z.signum()))
+                    };
 
                 let distance = delta.length().max(1e-6);
                 (distance, normal, overlap)
@@ -55,7 +61,11 @@ pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g:
                     j += 1;
                     continue;
                 }
-                let normal = if distance > 1e-6 { delta / distance } else { vec3(1.0, 0.0, 0.0) };
+                let normal = if distance > 1e-6 {
+                    delta / distance
+                } else {
+                    vec3(1.0, 0.0, 0.0)
+                };
                 let overlap = (radius_sum - distance).max(0.0);
                 (distance, normal, overlap)
             };
@@ -103,9 +113,11 @@ pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g:
                 if tangential_speed > 1e-6 {
                     let tangent = tangential_velocity / tangential_speed;
                     let desired_friction_impulse = -tangential_speed / inv_mass_sum;
-                    let friction_coefficient = (particles[i].friction * particles[j].friction).sqrt();
+                    let friction_coefficient =
+                        (particles[i].friction * particles[j].friction).sqrt();
                     let max_friction_impulse = friction_coefficient * normal_impulse.abs();
-                    let friction_impulse = desired_friction_impulse.clamp(-max_friction_impulse, max_friction_impulse);
+                    let friction_impulse =
+                        desired_friction_impulse.clamp(-max_friction_impulse, max_friction_impulse);
 
                     particles[i].vel -= tangent * (friction_impulse / m1);
                     particles[j].vel += tangent * (friction_impulse / m2);

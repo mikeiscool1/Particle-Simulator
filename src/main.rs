@@ -42,6 +42,10 @@ struct State {
     ui_captures_pointer: bool,
     #[serde(skip_serializing, skip_deserializing, default)]
     events: Vec<component::Event>, // Events that components can trigger to communicate with each other
+    #[serde(skip_serializing, skip_deserializing, default)]
+    demo_n: u32,
+    #[serde(skip_serializing, skip_deserializing, default)]
+    demo_type: setup::Demo,
 }
 
 impl State {
@@ -87,6 +91,8 @@ async fn main() {
         bg_color: Color::new(0.1, 0.1, 0.15, 1.0),
         show_grid: false,
         events: Vec::new(),
+        demo_n: 1000,
+        demo_type: setup::Demo::Gravity,
     };
 
     let mut particles = Particles {
@@ -99,7 +105,7 @@ async fn main() {
         time: 0.0,
         parametric_equations: Vec::new(),
     };
-    set_particles(&mut particles.particles);
+    set_particles(&mut particles.particles, state.demo_n, state.demo_type);
 
     let mut grid = Grid {};
     let mut alert = Alert::new();
@@ -140,7 +146,7 @@ async fn main() {
                     state.clock_running = false;
                     particles.time = 0.0;
                     if !particles.use_parametric {
-                        set_particles(&mut particles.particles);
+                        set_particles(&mut particles.particles, state.demo_n, state.demo_type);
                     } else {
                         for parametric in &particles.parametric_equations {
                             parametric.apply_to_particles(&mut particles.particles, particles.time);

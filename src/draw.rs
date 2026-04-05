@@ -1,7 +1,7 @@
 use crate::component::Particle;
 use macroquad::{Error, prelude::*};
-use std::sync::LazyLock;
 use std::mem::take;
+use std::sync::LazyLock;
 
 pub mod sphere {
     use super::*;
@@ -117,7 +117,7 @@ void main() {
         let mut indices = Vec::with_capacity(particles.len() * 6);
 
         let to_y = Vec3::Y;
-        
+
         let material = &SPHERE_MATERIAL;
         material.set_uniform("camera_pos", camera_pos);
         material.set_uniform("ViewProj", vp);
@@ -145,11 +145,17 @@ void main() {
 
             // frustum cull
             let clip = vp * vec4(p.pos.x, p.pos.y, p.pos.z, 1.0);
-            if clip.w <= 0.0 { continue; }
+            if clip.w <= 0.0 {
+                continue;
+            }
             let ndc = clip.xyz() / clip.w;
             let projected_radius = (p.radius / cos_alpha) / clip.w;
-            if ndc.x + projected_radius < -1.1 || ndc.x - projected_radius > 1.1 { continue; }
-            if ndc.y + projected_radius < -1.1 || ndc.y - projected_radius > 1.1 { continue; }
+            if ndc.x + projected_radius < -1.1 || ndc.x - projected_radius > 1.1 {
+                continue;
+            }
+            if ndc.y + projected_radius < -1.1 || ndc.y - projected_radius > 1.1 {
+                continue;
+            }
 
             let r = p.radius / cos_alpha;
 
@@ -193,7 +199,7 @@ void main() {
                 vertex_count = 0;
             }
         }
-        
+
         if !vertices.is_empty() {
             draw_mesh(&Mesh {
                 vertices,
@@ -351,11 +357,17 @@ void main() {
 
             // frustum cull
             let clip = vp * vec4(p.pos.x, p.pos.y, p.pos.z, 1.0);
-            if clip.w <= 0.0 { continue; }
+            if clip.w <= 0.0 {
+                continue;
+            }
             let ndc = clip.xyz() / clip.w;
             let projected_radius = (p.radius / cos_alpha) / clip.w;
-            if ndc.x + projected_radius < -1.1 || ndc.x - projected_radius > 1.1 { continue; }
-            if ndc.y + projected_radius < -1.1 || ndc.y - projected_radius > 1.1 { continue; }
+            if ndc.x + projected_radius < -1.1 || ndc.x - projected_radius > 1.1 {
+                continue;
+            }
+            if ndc.y + projected_radius < -1.1 || ndc.y - projected_radius > 1.1 {
+                continue;
+            }
 
             let r = max_radius / cos_alpha;
 

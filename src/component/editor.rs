@@ -17,6 +17,7 @@ use crate::component::{
         insert_implicit_mul,
     },
 };
+use crate::setup::{Demo, set_particles};
 
 #[derive(Serialize, Deserialize)]
 struct Save {
@@ -260,6 +261,14 @@ impl Editor {
 
                     ui.separator();
 
+                    egui::CollapsingHeader::new("Demos")
+                        .default_open(false)
+                        .show(ui, |ui| {
+                            self.draw_demos(ui, particles, state);
+                        });
+
+                    ui.separator();
+
                     egui::CollapsingHeader::new("Help")
                         .default_open(false)
                         .show(ui, |ui| {
@@ -319,7 +328,7 @@ impl Editor {
                 ui.add(
                     egui::DragValue::new(&mut state.speed)
                         .speed(0.01)
-                        .range(0.001..=1000.0_f32),
+                        .range(0.0..=f32::INFINITY),
                 );
                 ui.end_row();
             });
@@ -343,7 +352,7 @@ impl Editor {
                 ui.add(
                     egui::DragValue::new(&mut state.time_warp)
                         .speed(0.01)
-                        .range(0.001..=1000.0_f32),
+                        .range(0.0..=f32::INFINITY),
                 );
                 ui.end_row();
 
@@ -384,7 +393,7 @@ impl Editor {
                 ui.add(
                     egui::DragValue::new(&mut particles.g)
                         .speed(1e-13)
-                        .range(0.0..=1e-6_f32)
+                        .range(0.0..=f32::INFINITY)
                         .custom_formatter(|v, _| format!("{:.3e}", v))
                         .custom_parser(|s| s.parse::<f64>().ok()),
                 );
@@ -406,7 +415,7 @@ impl Editor {
                         .add(
                             egui::DragValue::new(&mut self.merge_mass_threshold)
                                 .speed(1e6)
-                                .range(0.0..=1e30_f32),
+                                .range(0.0..=f32::INFINITY),
                         )
                         .changed()
                     {
@@ -501,14 +510,14 @@ impl Editor {
                     ui.add(
                         egui::DragValue::new(&mut p.mass)
                             .speed(1e6)
-                            .range(0.0..=1e30_f32),
+                            .range(0.0..=f32::INFINITY),
                     );
 
                     ui.label("Radius");
                     ui.add(
                         egui::DragValue::new(&mut p.radius)
                             .speed(0.01)
-                            .range(0.001..=1e6_f32),
+                            .range(0.0..=f32::INFINITY),
                     );
 
                     ui.label("Friction");
@@ -618,7 +627,7 @@ impl Editor {
                                 .add(
                                     egui::DragValue::new(&mut eq.num_particles)
                                         .speed(1)
-                                        .range(1..=10000),
+                                        .range(1..=1_000_000),
                                 )
                                 .changed()
                             {
@@ -987,6 +996,38 @@ impl Editor {
                 "saves_list",
                 &serde_json::to_string(&self.saves_list).unwrap_or_else(|_| "[]".to_string()),
             );
+        }
+    }
+
+    fn draw_demos(&self, ui: &mut egui::Ui, particles: &mut Particles, state: &mut State) {
+        const DEMOS: [Demo; 5] = [
+            Demo::Gravity,
+            Demo::Explosion,
+            Demo::ExplosionGravity,
+            Demo::Vortex,
+            Demo::None,
+        ];
+
+        ui.label("Particles");
+        ui.add(
+            egui::DragValue::new(&mut state.demo_n)
+                .speed(1)
+                .range(1..=1_000_000),
+        );
+
+        ui.label("Demo");
+        for demo in &DEMOS {
+            if ui.button(format!("{}", demo)).clicked() {
+                state.demo_type = *demo;
+                state.clock_running = false;
+                particles.time = 0.0;
+                particles.use_parametric = false;
+                set_particles(&mut particles.particles, state.demo_n, *demo);
+
+                state
+                    .events
+                    .push(Event::Alert(format!("Loaded demo: {}", demo)));
+            }
         }
     }
 

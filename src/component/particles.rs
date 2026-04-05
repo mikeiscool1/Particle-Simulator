@@ -186,7 +186,12 @@ impl Particles {
             p.verlet_drift(dt);
         }
 
-        resolve_collisions(&mut self.particles, self.min_merge_mass, self.g, self.use_cubes);
+        resolve_collisions(
+            &mut self.particles,
+            self.min_merge_mass,
+            self.g,
+            self.use_cubes,
+        );
         n_body_update(&mut self.particles, self.g);
 
         for (p, &prev_acc) in self.particles.iter_mut().zip(old_acc.iter()) {
