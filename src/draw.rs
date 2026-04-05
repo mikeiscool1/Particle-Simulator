@@ -1,6 +1,7 @@
 use crate::component::Particle;
 use macroquad::{Error, prelude::*};
 use std::sync::LazyLock;
+use std::mem::take;
 
 pub mod sphere {
     use super::*;
@@ -116,6 +117,12 @@ void main() {
         let mut indices = Vec::with_capacity(particles.len() * 6);
 
         let to_y = Vec3::Y;
+        
+        let material = &SPHERE_MATERIAL;
+        material.set_uniform("camera_pos", camera_pos);
+        material.set_uniform("ViewProj", vp);
+        gl_use_material(material);
+
         let mut vertex_count = 0;
 
         for p in particles.iter() {
@@ -135,6 +142,14 @@ void main() {
 
             let sin_alpha = p.radius / dist;
             let cos_alpha = (1.0 - sin_alpha * sin_alpha).sqrt();
+
+            // frustum cull
+            let clip = vp * vec4(p.pos.x, p.pos.y, p.pos.z, 1.0);
+            if clip.w <= 0.0 { continue; }
+            let ndc = clip.xyz() / clip.w;
+            let projected_radius = (p.radius / cos_alpha) / clip.w;
+            if ndc.x + projected_radius < -1.1 || ndc.x - projected_radius > 1.1 { continue; }
+            if ndc.y + projected_radius < -1.1 || ndc.y - projected_radius > 1.1 { continue; }
 
             let r = p.radius / cos_alpha;
 
@@ -167,18 +182,26 @@ void main() {
             ]);
 
             vertex_count += 4;
+
+            if indices.len() >= 63990 {
+                draw_mesh(&Mesh {
+                    vertices: take(&mut vertices),
+                    indices: take(&mut indices),
+                    texture: None,
+                });
+
+                vertex_count = 0;
+            }
+        }
+        
+        if !vertices.is_empty() {
+            draw_mesh(&Mesh {
+                vertices,
+                indices,
+                texture: None,
+            });
         }
 
-        let material = &SPHERE_MATERIAL;
-        material.set_uniform("camera_pos", camera_pos);
-        material.set_uniform("ViewProj", vp);
-
-        gl_use_material(material);
-        draw_mesh(&Mesh {
-            vertices,
-            indices,
-            texture: None,
-        });
         gl_use_default_material();
     }
 }
@@ -292,6 +315,11 @@ void main() {
         let mut vertices: Vec<Vertex> = Vec::with_capacity(particles.len() * 4);
         let mut indices: Vec<u16> = Vec::with_capacity(particles.len() * 6);
 
+        let material = &CUBE_MATERIAL;
+        material.set_uniform("camera_pos", camera_pos);
+        material.set_uniform("ViewProj", vp);
+        gl_use_material(material);
+
         let mut vertex_count = 0;
 
         for p in particles.iter() {
@@ -320,6 +348,14 @@ void main() {
 
             let sin_alpha = max_radius / safe_dist;
             let cos_alpha = (1.0 - sin_alpha * sin_alpha).sqrt();
+
+            // frustum cull
+            let clip = vp * vec4(p.pos.x, p.pos.y, p.pos.z, 1.0);
+            if clip.w <= 0.0 { continue; }
+            let ndc = clip.xyz() / clip.w;
+            let projected_radius = (p.radius / cos_alpha) / clip.w;
+            if ndc.x + projected_radius < -1.1 || ndc.x - projected_radius > 1.1 { continue; }
+            if ndc.y + projected_radius < -1.1 || ndc.y - projected_radius > 1.1 { continue; }
 
             let r = max_radius / cos_alpha;
 
@@ -351,17 +387,26 @@ void main() {
             ]);
 
             vertex_count += 4;
+
+            if indices.len() >= 63990 {
+                draw_mesh(&Mesh {
+                    vertices: take(&mut vertices),
+                    indices: take(&mut indices),
+                    texture: None,
+                });
+
+                vertex_count = 0;
+            }
         }
 
-        let material = &CUBE_MATERIAL;
-        material.set_uniform("camera_pos", camera_pos);
-        material.set_uniform("ViewProj", vp);
-        gl_use_material(material);
-        draw_mesh(&Mesh {
-            vertices,
-            indices,
-            texture: None,
-        });
+        if !vertices.is_empty() {
+            draw_mesh(&Mesh {
+                vertices,
+                indices,
+                texture: None,
+            });
+        }
+
         gl_use_default_material();
     }
 }
