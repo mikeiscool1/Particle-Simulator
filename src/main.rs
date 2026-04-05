@@ -3,15 +3,16 @@ use macroquad::prelude::*;
 use serde::{Deserialize, Serialize};
 
 mod component;
-mod input;
+mod draw;
 mod force;
-mod setup;
+mod input;
 mod serde_helper;
+mod setup;
 
-use component::{Component, Grid, Particles, Alert, Editor};
+use component::{Alert, Component, Editor, Grid, Particles};
 use input::handle_input;
-use setup::set_particles;
 use serde_helper::serde_color;
+use setup::set_particles;
 
 #[derive(Serialize, Deserialize)]
 struct State {
@@ -70,7 +71,6 @@ fn window_conf() -> Conf {
 async fn main() {
     gl_set_drawcall_buffer_capacity(64000, 64000);
 
-
     let mut state = State {
         yaw: -135.0f32.to_radians(),
         pitch: -45.0f32.to_radians(),
@@ -89,9 +89,9 @@ async fn main() {
         events: Vec::new(),
     };
 
-    let mut particles = Particles { 
-        particles: Vec::new(), 
-        show_trail: true, 
+    let mut particles = Particles {
+        particles: Vec::new(),
+        show_trail: true,
         use_cubes: false,
         min_merge_mass: -1.0,
         g: 6.67430e-11,
@@ -103,7 +103,11 @@ async fn main() {
 
     let mut grid = Grid {};
     let mut alert = Alert::new();
-    let mut fps = component::FPS { visible: false, last_update_time: 0.0, fps: get_fps() };
+    let mut fps = component::FPS {
+        visible: false,
+        last_update_time: 0.0,
+        fps: get_fps(),
+    };
     let mut editor = Editor::new(true);
 
     let _ = editor.try_compile_parametric(&mut particles);
@@ -141,7 +145,6 @@ async fn main() {
                         for parametric in &particles.parametric_equations {
                             parametric.apply_to_particles(&mut particles.particles, particles.time);
                         }
-
                     }
                     alert.alert("Simulation Reset");
                 }
@@ -156,7 +159,7 @@ async fn main() {
         // Draw
         clear_background(state.bg_color);
         set_camera(&state.camera);
-        
+
         grid.draw(&state);
         particles.draw(&state);
         fps.draw(&state);

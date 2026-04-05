@@ -1,9 +1,9 @@
-use macroquad::prelude::*;
 use crate::State;
 use crate::component::Event;
+use macroquad::prelude::*;
 
 pub fn handle_input(state: &mut State, dt: f32) {
-// Full screen check
+    // Full screen check
     if is_key_pressed(KeyCode::F11) {
         if !state.is_fullscreen {
             // Enter fullscreen
@@ -38,9 +38,13 @@ pub fn handle_input(state: &mut State, dt: f32) {
         state.clock_running = !state.clock_running;
 
         if state.clock_running {
-            state.events.push(Event::Alert("Simulation Running".to_string()));
+            state
+                .events
+                .push(Event::Alert("Simulation Running".to_string()));
         } else {
-            state.events.push(Event::Alert("Simulation Paused".to_string()));
+            state
+                .events
+                .push(Event::Alert("Simulation Paused".to_string()));
         }
     }
 
@@ -73,7 +77,9 @@ pub fn handle_input(state: &mut State, dt: f32) {
             let dy = mouse.1 - ly;
             state.yaw += dx * sensitivity;
             state.pitch -= dy * sensitivity;
-            state.pitch = state.pitch.clamp(-89.0f32.to_radians(), 89.0f32.to_radians());
+            state.pitch = state
+                .pitch
+                .clamp(-89.0f32.to_radians(), 89.0f32.to_radians());
         }
         state.last_mouse = Some(mouse);
     } else {
@@ -81,18 +87,38 @@ pub fn handle_input(state: &mut State, dt: f32) {
     }
 
     // Arrow key look
-    if is_key_down(KeyCode::Up) { state.pitch += 2.0*sensitivity; }
-    if is_key_down(KeyCode::Down) { state.pitch -= 2.0*sensitivity; }
-    if is_key_down(KeyCode::Left) { state.yaw -= 2.0*sensitivity; }
-    if is_key_down(KeyCode::Right) { state.yaw += 2.0*sensitivity; }
+    if is_key_down(KeyCode::Up) {
+        state.pitch += 2.0 * sensitivity;
+    }
+    if is_key_down(KeyCode::Down) {
+        state.pitch -= 2.0 * sensitivity;
+    }
+    if is_key_down(KeyCode::Left) {
+        state.yaw -= 2.0 * sensitivity;
+    }
+    if is_key_down(KeyCode::Right) {
+        state.yaw += 2.0 * sensitivity;
+    }
 
     // WASDEQ movement
-    if is_key_down(KeyCode::W) { state.pos += forward * state.speed * 10.0 * dt; }
-    if is_key_down(KeyCode::S) { state.pos -= forward * state.speed * 10.0 * dt; }
-    if is_key_down(KeyCode::A) { state.pos -= right * state.speed * 10.0 * dt; }
-    if is_key_down(KeyCode::D) { state.pos += right * state.speed * 10.0 * dt; }
-    if is_key_down(KeyCode::E) { state.pos.y += state.speed * 10.0 * dt; }
-    if is_key_down(KeyCode::Q) { state.pos.y -= state.speed * 10.0 * dt; }
+    if is_key_down(KeyCode::W) {
+        state.pos += forward * state.speed * 10.0 * dt;
+    }
+    if is_key_down(KeyCode::S) {
+        state.pos -= forward * state.speed * 10.0 * dt;
+    }
+    if is_key_down(KeyCode::A) {
+        state.pos -= right * state.speed * 10.0 * dt;
+    }
+    if is_key_down(KeyCode::D) {
+        state.pos += right * state.speed * 10.0 * dt;
+    }
+    if is_key_down(KeyCode::E) {
+        state.pos.y += state.speed * 10.0 * dt;
+    }
+    if is_key_down(KeyCode::Q) {
+        state.pos.y -= state.speed * 10.0 * dt;
+    }
     // Reset
     if is_key_pressed(KeyCode::R) {
         state.events.push(Event::ResetSimulation);
@@ -101,19 +127,29 @@ pub fn handle_input(state: &mut State, dt: f32) {
     // Setting toggles
     if is_key_pressed(KeyCode::F1) {
         state.time_warp *= 0.5;
-        state.events.push(Event::Alert(format!("Time Warp: {}x", format_dec(state.time_warp))));
+        state.events.push(Event::Alert(format!(
+            "Time Warp: {}x",
+            format_dec(state.time_warp)
+        )));
     }
     if is_key_pressed(KeyCode::F2) {
         state.time_warp *= 2.0;
-        state.events.push(Event::Alert(format!("Time Warp: {}x", format_dec(state.time_warp))));
+        state.events.push(Event::Alert(format!(
+            "Time Warp: {}x",
+            format_dec(state.time_warp)
+        )));
     }
     if is_key_pressed(KeyCode::F3) {
         state.speed *= 0.5;
-        state.events.push(Event::Alert(format!("Speed: {}x", format_dec(state.speed))));
+        state
+            .events
+            .push(Event::Alert(format!("Speed: {}x", format_dec(state.speed))));
     }
     if is_key_pressed(KeyCode::F4) {
         state.speed *= 2.0;
-        state.events.push(Event::Alert(format!("Speed: {}x", format_dec(state.speed))));
+        state
+            .events
+            .push(Event::Alert(format!("Speed: {}x", format_dec(state.speed))));
     }
     if is_key_pressed(KeyCode::O) {
         state.yaw = -135.0f32.to_radians();
@@ -125,5 +161,8 @@ pub fn handle_input(state: &mut State, dt: f32) {
 
 fn format_dec(value: f32) -> String {
     let formatted = format!("{:.6}", value);
-    formatted.trim_end_matches('0').trim_end_matches('.').to_string()
+    formatted
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_string()
 }

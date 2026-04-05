@@ -28,7 +28,6 @@ impl Component for FPS {
                 },
             );
 
-
             set_camera(&state.camera);
         }
     }
@@ -50,4 +49,3 @@ impl Component for FPS {
         }
     }
 }
-

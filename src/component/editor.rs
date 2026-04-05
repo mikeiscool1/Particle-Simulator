@@ -1,6 +1,6 @@
 use egui_macroquad::egui;
 use macroquad::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use serde_json::json;
 #[cfg(not(target_arch = "wasm32"))]
@@ -9,8 +9,14 @@ use std::path::PathBuf;
 #[cfg(target_arch = "wasm32")]
 use quad_storage::STORAGE;
 
-use crate::component::{Component, Event, particles::{DomainLoopDirection, ParametricEquations, Particle, Particles, compile_parametric_fn, insert_implicit_mul}};
 use crate::State;
+use crate::component::{
+    Component, Event,
+    particles::{
+        DomainLoopDirection, ParametricEquations, Particle, Particles, compile_parametric_fn,
+        insert_implicit_mul,
+    },
+};
 
 #[derive(Serialize, Deserialize)]
 struct Save {
@@ -104,7 +110,7 @@ pub struct Editor {
     merge_enabled: bool,
     merge_mass_threshold: f32,
     parametric_equations: Vec<ParametricEquationEditor>,
-    
+
     #[serde(skip_serializing, skip_deserializing, default)]
     expanded_particles: Vec<bool>,
     #[serde(skip_serializing, skip_deserializing, default)]
@@ -127,7 +133,8 @@ impl Editor {
 
         #[cfg(not(target_arch = "wasm32"))]
         {
-            config_dir = directories::ProjectDirs::from("", "", "ParticleSimulator").map(|dirs| dirs.config_dir().to_path_buf());
+            config_dir = directories::ProjectDirs::from("", "", "ParticleSimulator")
+                .map(|dirs| dirs.config_dir().to_path_buf());
 
             if let Some(dir) = &config_dir {
                 std::fs::create_dir_all(dir).unwrap_or_else(|err| {
@@ -138,16 +145,23 @@ impl Editor {
             saves_list = if let Some(config_dir) = &config_dir {
                 std::fs::read_dir(config_dir)
                     .map(|entries| {
-                        entries.filter_map(|entry| {
-                            entry.ok().and_then(|e| {
-                                let path = e.path();
-                                if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("json") {
-                                    path.file_stem().and_then(|stem| stem.to_str()).map(|s| s.to_string())
-                                } else {
-                                    None
-                                }
+                        entries
+                            .filter_map(|entry| {
+                                entry.ok().and_then(|e| {
+                                    let path = e.path();
+                                    if path.is_file()
+                                        && path.extension().and_then(|ext| ext.to_str())
+                                            == Some("json")
+                                    {
+                                        path.file_stem()
+                                            .and_then(|stem| stem.to_str())
+                                            .map(|s| s.to_string())
+                                    } else {
+                                        None
+                                    }
+                                })
                             })
-                        }).collect()
+                            .collect()
                     })
                     .unwrap_or_else(|_| Vec::new())
             } else {
@@ -157,9 +171,11 @@ impl Editor {
         #[cfg(target_arch = "wasm32")]
         {
             let mut storage = STORAGE.lock().unwrap();
-            saves_list = serde_json::from_str(&storage.get("saves_list")
-                .unwrap_or_else(|| { storage.set("saves_list", "[]"); "[]".to_string() }))
-                .unwrap_or_else(|_| Vec::new());
+            saves_list = serde_json::from_str(&storage.get("saves_list").unwrap_or_else(|| {
+                storage.set("saves_list", "[]");
+                "[]".to_string()
+            }))
+            .unwrap_or_else(|_| Vec::new());
         }
 
         Self {
@@ -174,7 +190,7 @@ impl Editor {
             #[cfg(not(target_arch = "wasm32"))]
             config_dir,
 
-            saves_list
+            saves_list,
         }
     }
 
@@ -224,12 +240,15 @@ impl Editor {
 
                     ui.separator();
 
-                    egui::CollapsingHeader::new(format!("Particles ({})", particles.particles.len()))
-                        .id_salt("particles_list_header")
-                        .default_open(false)
-                        .show(ui, |ui| {
-                            self.draw_particles(ui, particles);
-                        });
+                    egui::CollapsingHeader::new(format!(
+                        "Particles ({})",
+                        particles.particles.len()
+                    ))
+                    .id_salt("particles_list_header")
+                    .default_open(false)
+                    .show(ui, |ui| {
+                        self.draw_particles(ui, particles);
+                    });
 
                     ui.separator();
 
@@ -237,7 +256,7 @@ impl Editor {
                         .default_open(false)
                         .show(ui, |ui| {
                             self.draw_saves(ui, particles, state);
-                    });
+                        });
 
                     ui.separator();
 
@@ -315,7 +334,7 @@ impl Editor {
                 ui.label("Clock Running");
                 ui.checkbox(&mut state.clock_running, "");
                 ui.end_row();
-                
+
                 ui.label("Elapsed Time");
                 ui.add(egui::DragValue::new(&mut particles.time).speed(0.1));
                 ui.end_row();
@@ -336,7 +355,11 @@ impl Editor {
                         p.hidden = false;
                     }
                     if particles.use_parametric {
-                        let used: usize = particles.parametric_equations.iter().map(|eq| eq.particle_indices.len()).sum();
+                        let used: usize = particles
+                            .parametric_equations
+                            .iter()
+                            .map(|eq| eq.particle_indices.len())
+                            .sum();
                         for i in used..particles.particles.len() {
                             particles.particles[i].hidden = true;
                         }
@@ -437,7 +460,10 @@ impl Editor {
                 } else {
                     egui::Color32::LIGHT_GRAY
                 };
-                if ui.selectable_label(expanded, egui::RichText::new(&row_label).color(text_color)).clicked() {
+                if ui
+                    .selectable_label(expanded, egui::RichText::new(&row_label).color(text_color))
+                    .clicked()
+                {
                     if let Some(slot) = self.expanded_particles.get_mut(i) {
                         *slot = !*slot;
                     }
@@ -499,13 +525,9 @@ impl Editor {
                             .range(0.0..=1.0_f32),
                     );
 
-
                     ui.label("Color");
                     let mut rgba = [p.color.r, p.color.g, p.color.b, p.color.a];
-                    if ui
-                        .color_edit_button_rgba_unmultiplied(&mut rgba)
-                        .changed()
-                    {
+                    if ui.color_edit_button_rgba_unmultiplied(&mut rgba).changed() {
                         p.color = Color::new(rgba[0], rgba[1], rgba[2], rgba[3]);
                     }
 
@@ -531,7 +553,8 @@ impl Editor {
 
         ui.horizontal(|ui| {
             if ui.button("+ Add Equation").clicked() {
-                self.parametric_equations.push(ParametricEquationEditor::default());
+                self.parametric_equations
+                    .push(ParametricEquationEditor::default());
                 self.expanded_parametric.push(false);
                 changed = true;
             }
@@ -557,7 +580,8 @@ impl Editor {
                 } else {
                     egui::Color32::LIGHT_GRAY
                 };
-                let row_label = egui::RichText::new(format!("Equation {}", i + 1)).color(label_color);
+                let row_label =
+                    egui::RichText::new(format!("Equation {}", i + 1)).color(label_color);
                 if ui.selectable_label(expanded, row_label).clicked() {
                     if let Some(slot) = self.expanded_parametric.get_mut(i) {
                         *slot = !*slot;
@@ -590,25 +614,48 @@ impl Editor {
                         .spacing([8.0, 6.0])
                         .show(ui, |ui| {
                             ui.label("Particles");
-                            if ui.add(egui::DragValue::new(&mut eq.num_particles).speed(1).range(1..=10000)).changed() {
+                            if ui
+                                .add(
+                                    egui::DragValue::new(&mut eq.num_particles)
+                                        .speed(1)
+                                        .range(1..=10000),
+                                )
+                                .changed()
+                            {
                                 changed = true;
                             }
                             ui.end_row();
 
                             ui.label("x =");
-                            changed |= draw_parametric_row(ui, &mut eq.x_expr, eq.x_expr_error, "e.g. sin(t)");
+                            changed |= draw_parametric_row(
+                                ui,
+                                &mut eq.x_expr,
+                                eq.x_expr_error,
+                                "e.g. sin(t)",
+                            );
                             ui.end_row();
 
                             ui.label("y =");
-                            changed |= draw_parametric_row(ui, &mut eq.y_expr, eq.y_expr_error, "e.g. cos(t)");
+                            changed |= draw_parametric_row(
+                                ui,
+                                &mut eq.y_expr,
+                                eq.y_expr_error,
+                                "e.g. cos(t)",
+                            );
                             ui.end_row();
 
                             ui.label("z =");
-                            changed |= draw_parametric_row(ui, &mut eq.z_expr, eq.z_expr_error, "e.g. t");
+                            changed |=
+                                draw_parametric_row(ui, &mut eq.z_expr, eq.z_expr_error, "e.g. t");
                             ui.end_row();
 
                             ui.label("Spread = ");
-                            changed |= draw_parametric_row(ui, &mut eq.spread_expr, eq.spread_expr_error, "e.g. 0.1");
+                            changed |= draw_parametric_row(
+                                ui,
+                                &mut eq.spread_expr,
+                                eq.spread_expr_error,
+                                "e.g. 0.1",
+                            );
                             ui.end_row();
 
                             ui.label("Use Domain");
@@ -617,11 +664,21 @@ impl Editor {
 
                             if eq.use_domain {
                                 ui.label("Min = ");
-                                changed |= draw_parametric_row(ui, &mut eq.domain_lower_expr, eq.domain_lower_expr_error, "0.0");
+                                changed |= draw_parametric_row(
+                                    ui,
+                                    &mut eq.domain_lower_expr,
+                                    eq.domain_lower_expr_error,
+                                    "0.0",
+                                );
                                 ui.end_row();
 
                                 ui.label("Max = ");
-                                changed |= draw_parametric_row(ui, &mut eq.domain_upper_expr, eq.domain_upper_expr_error, "10.0");
+                                changed |= draw_parametric_row(
+                                    ui,
+                                    &mut eq.domain_upper_expr,
+                                    eq.domain_upper_expr_error,
+                                    "10.0",
+                                );
                                 ui.end_row();
 
                                 ui.label("Direction");
@@ -633,10 +690,18 @@ impl Editor {
                                     .selected_text(direction_text)
                                     .show_ui(ui, |ui| {
                                         changed |= ui
-                                            .selectable_value(&mut eq.domain_direction, DomainLoopDirection::Wrap, "Wrap")
+                                            .selectable_value(
+                                                &mut eq.domain_direction,
+                                                DomainLoopDirection::Wrap,
+                                                "Wrap",
+                                            )
                                             .changed();
                                         changed |= ui
-                                            .selectable_value(&mut eq.domain_direction, DomainLoopDirection::PingPong, "Ping Pong")
+                                            .selectable_value(
+                                                &mut eq.domain_direction,
+                                                DomainLoopDirection::PingPong,
+                                                "Ping Pong",
+                                            )
                                             .changed();
                                     });
                                 ui.end_row();
@@ -666,7 +731,9 @@ impl Editor {
 
         if changed && particles.use_parametric {
             match self.try_compile_parametric(particles) {
-                Ok(()) => state.events.push(Event::Alert("Parametric equations updated".to_string())),
+                Ok(()) => state
+                    .events
+                    .push(Event::Alert("Parametric equations updated".to_string())),
                 Err(()) => {}
             }
 
@@ -687,11 +754,18 @@ impl Editor {
             if ui.button("Save Current").clicked() {
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(config_dir) = &self.config_dir {
-                    let mut save_name = format!("save_{}.json", chrono::Local::now().format("%Y-%m-%d-%H-%M-%S"));
+                    let mut save_name = format!(
+                        "save_{}.json",
+                        chrono::Local::now().format("%Y-%m-%d-%H-%M-%S")
+                    );
                     let mut path = config_dir.join(&save_name);
                     let mut count = 1;
                     while path.exists() {
-                        save_name = format!("save_{}-{}.json", chrono::Local::now().format("%Y-%m-%d-%H-%M-%S"), count);
+                        save_name = format!(
+                            "save_{}-{}.json",
+                            chrono::Local::now().format("%Y-%m-%d-%H-%M-%S"),
+                            count
+                        );
                         path = config_dir.join(&save_name);
                         count += 1;
                     }
@@ -705,26 +779,40 @@ impl Editor {
                     match serde_json::to_string_pretty(&object) {
                         Ok(json) => {
                             if let Err(err) = std::fs::write(&path, json) {
-                                state.events.push(Event::Alert(format!("Failed to write save file: {}", err)));
+                                state.events.push(Event::Alert(format!(
+                                    "Failed to write save file: {}",
+                                    err
+                                )));
                                 eprintln!("Failed to write save file {:?}: {}", path, err);
                             } else {
-                                self.saves_list.push(save_name.trim_end_matches(".json").to_string());
-                                state.events.push(Event::Alert("Save successful".to_string()));
+                                self.saves_list
+                                    .push(save_name.trim_end_matches(".json").to_string());
+                                state
+                                    .events
+                                    .push(Event::Alert("Save successful".to_string()));
                             }
                         }
                         Err(err) => {
-                            state.events.push(Event::Alert(format!("Failed to serialize save data: {}", err)));
+                            state.events.push(Event::Alert(format!(
+                                "Failed to serialize save data: {}",
+                                err
+                            )));
                             eprintln!("Failed to serialize save data: {}", err);
                         }
                     }
                 }
-                #[cfg(target_arch="wasm32")]
+                #[cfg(target_arch = "wasm32")]
                 {
-                    let mut save_name = format!("save_{}.json", quad_timestamp::timestamp_utc().unwrap());
+                    let mut save_name =
+                        format!("save_{}.json", quad_timestamp::timestamp_utc().unwrap());
                     let mut count = 1;
 
                     while !self.saves_list.iter().all(|s| *s != save_name) {
-                        save_name = format!("save_{}-{}.json", quad_timestamp::timestamp_utc().unwrap(), count);
+                        save_name = format!(
+                            "save_{}-{}.json",
+                            quad_timestamp::timestamp_utc().unwrap(),
+                            count
+                        );
                         count += 1;
                     }
 
@@ -741,15 +829,26 @@ impl Editor {
 
                             // check if it was successfully saved
                             if storage.get(&save_name).is_none() {
-                                state.events.push(Event::Alert(format!("Failed to save: {}", save_name)));
+                                state
+                                    .events
+                                    .push(Event::Alert(format!("Failed to save: {}", save_name)));
                             } else {
                                 self.saves_list.push(save_name);
-                                storage.set("saves_list", &serde_json::to_string(&self.saves_list).unwrap_or_else(|_| "[]".to_string()));
-                                state.events.push(Event::Alert("Save successful".to_string()));
+                                storage.set(
+                                    "saves_list",
+                                    &serde_json::to_string(&self.saves_list)
+                                        .unwrap_or_else(|_| "[]".to_string()),
+                                );
+                                state
+                                    .events
+                                    .push(Event::Alert("Save successful".to_string()));
                             }
                         }
                         Err(err) => {
-                            state.events.push(Event::Alert(format!("Failed to serialize save data: {}", err)));
+                            state.events.push(Event::Alert(format!(
+                                "Failed to serialize save data: {}",
+                                err
+                            )));
                             eprintln!("Failed to serialize save data: {}", err);
                         }
                     }
@@ -776,15 +875,23 @@ impl Editor {
                                 Ok(contents) => match serde_json::from_str::<Save>(&contents) {
                                     Ok(loaded_save) => {
                                         selected_save = Some(loaded_save);
-                                        state.events.push(Event::Alert(format!("Loaded save: {}", save)));
+                                        state
+                                            .events
+                                            .push(Event::Alert(format!("Loaded save: {}", save)));
                                     }
                                     Err(err) => {
-                                        state.events.push(Event::Alert(format!("Failed to parse save file: {}", err)));
+                                        state.events.push(Event::Alert(format!(
+                                            "Failed to parse save file: {}",
+                                            err
+                                        )));
                                         eprintln!("Failed to parse save file {:?}: {}", path, err);
                                     }
                                 },
                                 Err(err) => {
-                                    state.events.push(Event::Alert(format!("Failed to read save file: {}", err)));
+                                    state.events.push(Event::Alert(format!(
+                                        "Failed to read save file: {}",
+                                        err
+                                    )));
                                     eprintln!("Failed to read save file {:?}: {}", path, err);
                                 }
                             }
@@ -795,15 +902,25 @@ impl Editor {
                                 Some(contents) => match serde_json::from_str::<Save>(&contents) {
                                     Ok(loaded_save) => {
                                         selected_save = Some(loaded_save);
-                                        state.events.push(Event::Alert(format!("Loaded save: {}", save)));
+                                        state
+                                            .events
+                                            .push(Event::Alert(format!("Loaded save: {}", save)));
                                     }
                                     Err(err) => {
-                                        state.events.push(Event::Alert(format!("Failed to parse save data: {}", err)));
-                                        eprintln!("Failed to parse save data for {}: {}", save, err);
+                                        state.events.push(Event::Alert(format!(
+                                            "Failed to parse save data: {}",
+                                            err
+                                        )));
+                                        eprintln!(
+                                            "Failed to parse save data for {}: {}",
+                                            save, err
+                                        );
                                     }
                                 },
                                 None => {
-                                    state.events.push(Event::Alert("Save data not found".to_string()));
+                                    state
+                                        .events
+                                        .push(Event::Alert("Save data not found".to_string()));
                                     eprintln!("Save data not found for {}", save);
                                 }
                             }
@@ -815,7 +932,10 @@ impl Editor {
                         if let Some(config_dir) = &self.config_dir {
                             let path = config_dir.join(format!("{}.json", save));
                             if let Err(err) = open::that(&path) {
-                                state.events.push(Event::Alert(format!("Failed to open save file: {}", err)));
+                                state.events.push(Event::Alert(format!(
+                                    "Failed to open save file: {}",
+                                    err
+                                )));
                                 eprintln!("Failed to open save file {:?}: {}", path, err);
                             }
                         }
@@ -826,10 +946,15 @@ impl Editor {
                         if let Some(config_dir) = &self.config_dir {
                             let path = config_dir.join(format!("{}.json", save));
                             if let Err(err) = std::fs::remove_file(&path) {
-                                state.events.push(Event::Alert(format!("Failed to delete save file: {}", err)));
+                                state.events.push(Event::Alert(format!(
+                                    "Failed to delete save file: {}",
+                                    err
+                                )));
                                 eprintln!("Failed to delete save file {:?}: {}", path, err);
                             } else {
-                                state.events.push(Event::Alert(format!("Deleted save: {}", save)));
+                                state
+                                    .events
+                                    .push(Event::Alert(format!("Deleted save: {}", save)));
                                 delete_save = Some(save.clone());
                             }
                         }
@@ -837,7 +962,9 @@ impl Editor {
                         {
                             let mut storage = STORAGE.lock().unwrap();
                             storage.remove(save);
-                            state.events.push(Event::Alert(format!("Deleted save: {}", save)));
+                            state
+                                .events
+                                .push(Event::Alert(format!("Deleted save: {}", save)));
                             delete_save = Some(save.clone());
                         }
                     }
@@ -856,7 +983,10 @@ impl Editor {
             self.saves_list.retain(|s| s != &save_to_delete);
 
             #[cfg(target_arch = "wasm32")]
-            STORAGE.lock().unwrap().set("saves_list", &serde_json::to_string(&self.saves_list).unwrap_or_else(|_| "[]".to_string()));
+            STORAGE.lock().unwrap().set(
+                "saves_list",
+                &serde_json::to_string(&self.saves_list).unwrap_or_else(|_| "[]".to_string()),
+            );
         }
     }
 
@@ -895,18 +1025,30 @@ impl Editor {
         ui.label("X, Y, Z: the parametric equations for the particle positions. These equations are functions of time t and the particle's current position (x, y, z).");
         ui.label("Spread: the time offset between particles in the same equation");
         ui.label("Use Domain: enables/disables domain looping.");
-        ui.label("Domain [min, max]: the range of the parameter t over which the equation is evaluated.");
+        ui.label(
+            "Domain [min, max]: the range of the parameter t over which the equation is evaluated.",
+        );
         ui.label("Direction: Wrap jumps from max back to min. Ping Pong goes back and forth between min and max.");
-        ui.label("Equation variables: t (time), i (particle index), x, y, z (current particle position)");
+        ui.label(
+            "Equation variables: t (time), i (particle index), x, y, z (current particle position)",
+        );
         ui.add_space(10.0);
     }
 
     pub fn try_compile_parametric(&mut self, particles: &mut Particles) -> Result<(), ()> {
         // First pass: validate num_particles and check total doesn't exceed available
-        let total_particles_requested: usize = self.parametric_equations.iter().map(|eq| eq.num_particles).sum();
-        
+        let total_particles_requested: usize = self
+            .parametric_equations
+            .iter()
+            .map(|eq| eq.num_particles)
+            .sum();
+
         if total_particles_requested > particles.particles.len() {
-            self.parametric_error = Some(format!("Total particles requested ({}) exceeds available ({})", total_particles_requested, particles.particles.len()));
+            self.parametric_error = Some(format!(
+                "Total particles requested ({}) exceeds available ({})",
+                total_particles_requested,
+                particles.particles.len()
+            ));
             return Err(());
         }
 
@@ -918,7 +1060,8 @@ impl Editor {
             }
         }
 
-        let mut compiled: Vec<ParametricEquations> = Vec::with_capacity(self.parametric_equations.len());
+        let mut compiled: Vec<ParametricEquations> =
+            Vec::with_capacity(self.parametric_equations.len());
         let mut particle_offset = 0;
         let mut has_errors = false;
 
@@ -936,22 +1079,29 @@ impl Editor {
                 Ok(value) => (value, false),
                 Err(_) => (0.0, true),
             };
-            eq.spread_expr_error = spread_parse_failed || spread.is_nan() || spread.is_infinite() || spread < 0.0;
+            eq.spread_expr_error =
+                spread_parse_failed || spread.is_nan() || spread.is_infinite() || spread < 0.0;
 
             let mut invalid_domain_bounds = false;
             let domain = if eq.use_domain {
-                let (domain_lower, domain_lower_parse_failed) = match eval_constant_expr(&eq.domain_lower_expr) {
-                    Ok(value) => (value, false),
-                    Err(_) => (0.0, true),
-                };
+                let (domain_lower, domain_lower_parse_failed) =
+                    match eval_constant_expr(&eq.domain_lower_expr) {
+                        Ok(value) => (value, false),
+                        Err(_) => (0.0, true),
+                    };
 
-                let (domain_upper, domain_upper_parse_failed) = match eval_constant_expr(&eq.domain_upper_expr) {
-                    Ok(value) => (value, false),
-                    Err(_) => (0.0, true),
-                };
+                let (domain_upper, domain_upper_parse_failed) =
+                    match eval_constant_expr(&eq.domain_upper_expr) {
+                        Ok(value) => (value, false),
+                        Err(_) => (0.0, true),
+                    };
 
-                eq.domain_lower_expr_error = domain_lower_parse_failed || domain_lower.is_nan() || domain_lower.is_infinite();
-                eq.domain_upper_expr_error = domain_upper_parse_failed || domain_upper.is_nan() || domain_upper.is_infinite();
+                eq.domain_lower_expr_error = domain_lower_parse_failed
+                    || domain_lower.is_nan()
+                    || domain_lower.is_infinite();
+                eq.domain_upper_expr_error = domain_upper_parse_failed
+                    || domain_upper.is_nan()
+                    || domain_upper.is_infinite();
                 invalid_domain_bounds = eq.domain_lower_expr_error
                     || eq.domain_upper_expr_error
                     || domain_upper <= domain_lower;
@@ -962,7 +1112,6 @@ impl Editor {
                 eq.domain_upper_expr_error = false;
                 None
             };
-
 
             if eq.x_expr_error {
                 eq.error = Some(format!("x: {}", x_fn_result.err().unwrap()));
@@ -991,7 +1140,8 @@ impl Editor {
             }
 
             // Allocate particle indices sequentially
-            let particle_indices: Vec<usize> = (particle_offset..particle_offset + eq.num_particles).collect();
+            let particle_indices: Vec<usize> =
+                (particle_offset..particle_offset + eq.num_particles).collect();
             particle_offset += eq.num_particles;
 
             // Apply hidden state to the assigned particles
@@ -1061,11 +1211,8 @@ fn eval_constant_expr(expr: &str) -> Result<f64, String> {
     meval::eval_str(expr).map_err(|err| err.to_string())
 }
 
-
 impl Component for Editor {
-    fn draw(&self, _state: &State) {
-
-    }
+    fn draw(&self, _state: &State) {}
 
     fn handle_input(&mut self, _state: &mut State) {
         if _state.ui_captures_keyboard {

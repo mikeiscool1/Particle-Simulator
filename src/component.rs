@@ -1,16 +1,16 @@
 use crate::State;
 
+pub mod alert;
+pub mod editor;
+pub mod fps;
 pub mod grid;
 pub mod particles;
-pub mod alert;
-pub mod fps;
-pub mod editor;
 
+pub use alert::Alert;
+pub use editor::Editor;
+pub use fps::FPS;
 pub use grid::Grid;
 pub use particles::{Particle, Particles};
-pub use alert::Alert;
-pub use fps::FPS;
-pub use editor::Editor;
 
 pub enum Event {
     Alert(String),

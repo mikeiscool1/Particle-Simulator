@@ -101,7 +101,5 @@ impl Component for Alert {
         }
     }
 
-    fn handle_input(&mut self, _state: &mut State) {
-        
-    }
+    fn handle_input(&mut self, _state: &mut State) {}
 }

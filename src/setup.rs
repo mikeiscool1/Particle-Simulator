@@ -1,5 +1,5 @@
-use macroquad::prelude::*;
 use crate::component::particles::Particle;
+use macroquad::prelude::*;
 
 pub fn set_particles(particles: &mut Vec<Particle>) {
     *particles = vec![];
@@ -9,8 +9,11 @@ pub fn set_particles(particles: &mut Vec<Particle>) {
     for x in 0..10 {
         for y in 0..10 {
             for z in 0..10 {
-                let pos = vec3(x as f32 * spacing - offset, y as f32
-                    * spacing - offset, z as f32 * spacing - offset);
+                let pos = vec3(
+                    x as f32 * spacing - offset,
+                    y as f32 * spacing - offset,
+                    z as f32 * spacing - offset,
+                );
                 let color = Color::new(
                     rand::gen_range(0.5, 1.0),
                     rand::gen_range(0.5, 1.0),

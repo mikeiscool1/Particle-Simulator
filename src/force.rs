@@ -1,13 +1,13 @@
-use macroquad::prelude::*;
 use crate::component::Particle;
+use macroquad::prelude::*;
 use std::collections::VecDeque;
 
-pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g: f32) {
+pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g: f32, use_cubes: bool) {
     let mut i = 0;
     while i < particles.len() {
         if particles[i].mass <= 0.0 {
             i += 1;
-            continue; // skip massless particles
+            continue;
         }
 
         let mut j = i + 1;
@@ -15,72 +15,100 @@ pub fn resolve_collisions(particles: &mut Vec<Particle>, min_merge_mass: f32, g:
         while j < particles.len() {
             if particles[j].mass <= 0.0 {
                 j += 1;
-                continue; // skip massless particles
+                continue;
             }
 
             let pi = particles[i].pos;
             let pj = particles[j].pos;
             let delta = pj - pi;
-            let distance = delta.length();
-            let radius_sum = particles[i].radius + particles[j].radius;
 
-            if distance <= radius_sum {
-                let normal = if distance > 1e-6 {
-                    delta / distance
-                } else {
-                    vec3(1.0, 0.0, 0.0)
-                };
+            let (distance, normal, overlap) = if use_cubes {
+                let half_i = particles[i].radius;
+                let half_j = particles[j].radius;
 
-                let overlap = (radius_sum - distance).max(0.0);
-                if overlap > 0.0 {
-                    let total_mass = particles[i].mass + particles[j].mass;
-                    let move_i = overlap * (particles[j].mass / total_mass);
-                    let move_j = overlap * (particles[i].mass / total_mass);
+                let penetration = vec3(
+                    (half_i + half_j) - delta.x.abs(),
+                    (half_i + half_j) - delta.y.abs(),
+                    (half_i + half_j) - delta.z.abs(),
+                );
 
-                    particles[i].pos -= normal * move_i;
-                    particles[j].pos += normal * move_j;
-                }
-
-                let relative_velocity = particles[j].vel - particles[i].vel;
-                let relative_speed_normal = relative_velocity.dot(normal);
-
-                let total_mass = particles[i].mass + particles[j].mass;
-                let escape_velocity = (2.0 * g * total_mass / distance.max(1e-6)).sqrt();
-                let approach_speed = (-relative_speed_normal).max(0.0);
-
-                let should_merge = min_merge_mass != -1.0 && particles[i].mass >= min_merge_mass && particles[j].mass >= min_merge_mass && approach_speed < escape_velocity;
-
-                if should_merge {
-                    merge_particles(particles, i, j);
+                if penetration.x <= 0.0 || penetration.y <= 0.0 || penetration.z <= 0.0 {
+                    j += 1;
                     continue;
                 }
 
-                if relative_speed_normal < 0.0 {
-                    let m1 = particles[i].mass;
-                    let m2 = particles[j].mass;
-                    let inv_mass_sum = 1.0 / m1 + 1.0 / m2;
-                    let e = (particles[i].restitution + particles[j].restitution) / 2.0;
-                    let normal_impulse = -(1.0 + e) * relative_speed_normal / inv_mass_sum;
+                // Resolve along axis of least penetration
+                let (overlap, normal) = if penetration.x < penetration.y && penetration.x < penetration.z {
+                    (penetration.x, vec3(delta.x.signum(), 0.0, 0.0))
+                } else if penetration.y < penetration.z {
+                    (penetration.y, vec3(0.0, delta.y.signum(), 0.0))
+                } else {
+                    (penetration.z, vec3(0.0, 0.0, delta.z.signum()))
+                };
 
-                    particles[i].vel -= normal * (normal_impulse / m1);
-                    particles[j].vel += normal * (normal_impulse / m2);
+                let distance = delta.length().max(1e-6);
+                (distance, normal, overlap)
+            } else {
+                let distance = delta.length();
+                let radius_sum = particles[i].radius + particles[j].radius;
+                if distance > radius_sum {
+                    j += 1;
+                    continue;
+                }
+                let normal = if distance > 1e-6 { delta / distance } else { vec3(1.0, 0.0, 0.0) };
+                let overlap = (radius_sum - distance).max(0.0);
+                (distance, normal, overlap)
+            };
 
-                    let post_normal_relative_velocity = particles[j].vel - particles[i].vel;
-                    let tangential_velocity = post_normal_relative_velocity
-                        - normal * post_normal_relative_velocity.dot(normal);
-                    let tangential_speed = tangential_velocity.length();
+            if overlap > 0.0 {
+                let total_mass = particles[i].mass + particles[j].mass;
+                let mass_i = particles[i].mass;
+                let mass_j = particles[j].mass;
 
-                    if tangential_speed > 1e-6 {
-                        let tangent = tangential_velocity / tangential_speed;
-                        let desired_friction_impulse = -tangential_speed / inv_mass_sum; // use tangential_speed directly
-                        let friction_coefficient = (particles[i].friction * particles[j].friction).sqrt();
-                        let max_friction_impulse = friction_coefficient * normal_impulse.abs();
-                        let friction_impulse = desired_friction_impulse
-                            .clamp(-max_friction_impulse, max_friction_impulse);
+                particles[i].pos -= normal * overlap * (mass_j / total_mass);
+                particles[j].pos += normal * overlap * (mass_i / total_mass);
+            }
 
-                        particles[i].vel -= tangent * (friction_impulse / m1);
-                        particles[j].vel += tangent * (friction_impulse / m2);
-                    }
+            let relative_velocity = particles[j].vel - particles[i].vel;
+            let relative_speed_normal = relative_velocity.dot(normal);
+
+            let total_mass = particles[i].mass + particles[j].mass;
+            let escape_velocity = (2.0 * g * total_mass / distance).sqrt();
+            let approach_speed = (-relative_speed_normal).max(0.0);
+
+            let should_merge = min_merge_mass != -1.0
+                && particles[i].mass >= min_merge_mass
+                && particles[j].mass >= min_merge_mass
+                && approach_speed < escape_velocity;
+
+            if should_merge {
+                merge_particles(particles, i, j);
+                continue;
+            }
+
+            if relative_speed_normal < 0.0 {
+                let m1 = particles[i].mass;
+                let m2 = particles[j].mass;
+                let inv_mass_sum = 1.0 / m1 + 1.0 / m2;
+                let e = (particles[i].restitution + particles[j].restitution) / 2.0;
+                let normal_impulse = -(1.0 + e) * relative_speed_normal / inv_mass_sum;
+
+                particles[i].vel -= normal * (normal_impulse / m1);
+                particles[j].vel += normal * (normal_impulse / m2);
+
+                let post_relative = particles[j].vel - particles[i].vel;
+                let tangential_velocity = post_relative - normal * post_relative.dot(normal);
+                let tangential_speed = tangential_velocity.length();
+
+                if tangential_speed > 1e-6 {
+                    let tangent = tangential_velocity / tangential_speed;
+                    let desired_friction_impulse = -tangential_speed / inv_mass_sum;
+                    let friction_coefficient = (particles[i].friction * particles[j].friction).sqrt();
+                    let max_friction_impulse = friction_coefficient * normal_impulse.abs();
+                    let friction_impulse = desired_friction_impulse.clamp(-max_friction_impulse, max_friction_impulse);
+
+                    particles[i].vel -= tangent * (friction_impulse / m1);
+                    particles[j].vel += tangent * (friction_impulse / m2);
                 }
             }
 
@@ -131,7 +159,7 @@ fn merge_particles(particles: &mut Vec<Particle>, i: usize, j: usize) {
 #[cfg(not(target_arch = "wasm32"))]
 pub fn n_body_update(particles: &mut [Particle], g: f32) {
     use rayon::prelude::*;
-    
+
     let n = particles.len();
 
     // Snapshot positions/masses to avoid borrow conflicts across threads
@@ -181,11 +209,15 @@ pub fn n_body_update(particles: &mut [Particle], g: f32) {
 
     for i in 0..n {
         let (pos_i, mass_i, radius_i) = snapshot[i];
-        if mass_i <= 0.0 { continue; }
+        if mass_i <= 0.0 {
+            continue;
+        }
 
         for j in (i + 1)..n {
             let (pos_j, mass_j, radius_j) = snapshot[j];
-            if mass_j <= 0.0 { continue; }
+            if mass_j <= 0.0 {
+                continue;
+            }
 
             let dir = pos_j - pos_i;
             let min_dist = radius_i + radius_j;
